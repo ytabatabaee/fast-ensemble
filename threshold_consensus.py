@@ -5,7 +5,6 @@ import argparse
 import csv
 import community.community_louvain as cl
 import numpy as np
-from networkx.algorithms.community import modularity
 
 
 def communities_to_dict(communities):
@@ -37,9 +36,9 @@ def initialize(graph, value):
     return graph
 
 
-def thresholding(graph, n_p, thresh):
+def thresholding(graph, thresh):
     remove_edges = []
-    bound = thresh * n_p
+    bound = thresh
     for u, v in graph.edges():
         if graph[u][v]['weight'] < bound:
             remove_edges.append((u, v))
@@ -60,7 +59,7 @@ def threshold_consensus(G, algorithm='leiden-cpm', n_p=20, tr=1, r=0.001):
             if c[node] != c[nbr]:
                 graph[node][nbr]['weight'] -= 1/n_p
 
-    graph = thresholding(graph, 1, 1)
+    graph = thresholding(graph, tr)
 
     return get_communities(graph, algorithm, 0)
 
@@ -77,8 +76,8 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--partitions", type=int, required=False,
                         help="Number of partitions in consensus clustering", default=10)
     args = parser.parse_args()
-    net = networkx.read_edgelist(args.edgelist, nodetype=int)
-    tc = threshold_consensus(net, args.algorithm, args.partitions, args.threshold, args.resolution)
+    net = nx.read_edgelist(args.edgelist, nodetype=int)
+    tc = threshold_consensus(net, args.algorithm.lower(), args.partitions, args.threshold, args.resolution)
     with open('tc_'+str(args.threshold)+'_'+args.edgelist, 'w') as out_file:
         writer = csv.writer(out_file, delimiter=' ')
         for node, mem in tc.items():
