@@ -26,7 +26,30 @@ def group_to_partition(partition):
     return part_dict.values()
 
 
+def network_statistics(graph, ground_truth_membership=None, show_connected_components=False):
+    print('** Network statistics **')
+    node_count, edge_count, isolate_count = graph.number_of_nodes(), graph.number_of_edges(), len(
+        list(nx.isolates(graph)))
+    connected_components_sizes = [len(c) for c in sorted(nx.connected_components(graph), key=len, reverse=True)]
+    connected_component_num = nx.number_connected_components(graph)
+    max_connected_component = max(connected_components_sizes)
+    degrees = [d for n, d in graph.degree()]
+    min_degree, max_degree, mean_degree, median_degree = np.min(degrees), np.max(degrees), np.mean(degrees), np.median(
+        degrees)
+    print('#nodes, #edges, #singletons:', node_count, edge_count, isolate_count)
+    print('num connected comp:', connected_component_num)
+    print('max connected comp size:', max_connected_component)
+    if show_connected_components:
+        print(connected_components_sizes)
+    print('min, max, mean, median degree:', min_degree, max_degree, mean_degree, median_degree)
+    if ground_truth_membership:
+        print('ground truth partition statistics')
+        partition_statistics(graph, group_to_partition(membership_list_to_dict(ground_truth_membership)))
+    return node_count, edge_count, isolate_count, connected_component_num, max_connected_component, min_degree, max_degree, mean_degree, median_degree
+
+
 def partition_statistics(G, partition, show_cluster_size_dist=True):
+    print('\n** Partition statistics **')
     cluster_num = len(partition)
     cluster_sizes = [len(c) for c in partition]
     min_size, max_size, mean_size, median_size = np.min(cluster_sizes), np.max(cluster_sizes), np.mean(
@@ -39,7 +62,7 @@ def partition_statistics(G, partition, show_cluster_size_dist=True):
 
     print('#clusters in partition:', cluster_num)
     if show_cluster_size_dist:
-        print('Cluster sizes:')
+        print('cluster sizes:')
         print(sorted(cluster_sizes, reverse=True))
     print('min, max, mean, median cluster sizes:', min_size, max_size, mean_size, median_size)
     print('number of singletons:', singletons_num)
@@ -59,6 +82,7 @@ if __name__ == "__main__":
     #                    help="Ground-truth membership")
     args = parser.parse_args()
     net = nx.read_edgelist(args.edgelist, nodetype=int)
+    network_statistics(net)
     partition = get_membership_list_from_file(args.membership)
     partition = group_to_partition(partition)
     partition_statistics(net, partition)
