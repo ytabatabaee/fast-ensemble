@@ -60,7 +60,6 @@ def threshold_consensus(G, algorithm='leiden-cpm', n_p=20, tr=1, r=0.001):
                 graph[node][nbr]['weight'] -= 1/n_p
 
     graph = thresholding(graph, tr)
-
     return get_communities(graph, algorithm, 0)
 
 if __name__ == "__main__":
@@ -78,7 +77,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     net = nx.read_edgelist(args.edgelist, nodetype=int)
     tc = threshold_consensus(net, args.algorithm.lower(), args.partitions, args.threshold, args.resolution)
-    with open('tc_'+str(args.threshold)+'_'+args.edgelist, 'w') as out_file:
+    with open('tc_'+str(args.threshold)+'_'+args.edgelist.split('/')[-1], 'w') as out_file:
         writer = csv.writer(out_file, delimiter=' ')
         for node, mem in tc.items():
             writer.writerow([node]+[mem])

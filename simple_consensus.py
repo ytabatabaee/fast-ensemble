@@ -113,7 +113,7 @@ if __name__ == "__main__":
     lou_lei_alg_list = ['louvain'] * int(n_p / 2) + ['leiden-cpm'] * (n_p - int(n_p / 2))
     sc = simple_consensus(net, lou_lei_alg_list, [args.resolution] * n_p, [1] * n_p, args.threshold)
 
-    with open('sc_'+str(args.threshold)+'_'+args.edgelist, 'w') as out_file:
+    with open('sc_'+str(args.threshold)+'_'+args.edgelist.split('/')[-1], 'w') as out_file:
         writer = csv.writer(out_file, delimiter=' ')
         for node, mem in sc.items():
             writer.writerow([node]+[mem])
