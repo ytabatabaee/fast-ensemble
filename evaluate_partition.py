@@ -61,7 +61,7 @@ def partition_statistics(G, partition, show_cluster_size_dist=True):
     coverage = (G.number_of_nodes() - len(singletons)) / G.number_of_nodes()
 
     print('#clusters in partition:', cluster_num)
-    if show_cluster_size_dist:
+    if show_cluster_size_dist and cluster_num < 100:
         print('cluster sizes:')
         print(sorted(cluster_sizes, reverse=True))
     print('min, max, mean, median cluster sizes:', min_size, max_size, mean_size, median_size)

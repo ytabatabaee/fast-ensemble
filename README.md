@@ -3,7 +3,7 @@
 This respository includes Simple Consensus (SC) and Threshold Consensus (TC). The algorithms and the codes use many ideas from the Fast Consensus Clustering software available at https://github.com/kaiser-dan/fastconsensus and the paper [Fast consensus clustering in complex networks](https://arxiv.org/pdf/1902.04014.pdf), Phys. Rev. E., 2019.
 
 ### Threshold consensus
-This implementation of the Threshold Consensus runs a clustering algorithm $n_p$ times with different random seeds in a single iteration and only keeps the edges that appear in at least $\tau$ proportion of the partitions. When $\tau=1$, this is equivalent to *strict* consensus. 
+This implementation of the Threshold Consensus runs a clustering algorithm $n_p$ times with different random seeds in a single iteration and only keeps the edges that appear in at least $\tau$ proportion of the partitions. When $\tau=1$, this is equivalent to *strict* consensus.
 ```
 $ python3 threshold_consensus.py -n <edge-list> -t <threshold> -a <algorithm> -r <resolution-value> -p <number-partitions>
 ```
@@ -30,8 +30,7 @@ $ python3 simple_consensus.py -n <edge-list> -t <threshold> -r <resolution-value
  -d,  --delta              convergence parameter
  -p,  --maxiter            maximum number of iterations
 ```
-The script `evaluate_partitions.py` can be used to evaluate the output partition in terms of cluster statistics and modularity:
+The script `evaluate_partition.py` can be used to evaluate the output partition in terms of cluster statistics and modularity:
 ```
-$ python3 evaluate_partitions.py -n <edge-list> -m <partition-membership>
+$ python3 evaluate_partition.py -n <edge-list> -m <partition-membership>
 ```
-
