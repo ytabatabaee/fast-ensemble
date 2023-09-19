@@ -105,12 +105,20 @@ if __name__ == "__main__":
                         help="Convergence parameter", default=0.02)
     parser.add_argument("-m", "--maxiter", type=int, required=False,
                         help="Maximum number of iterations in simple consensus", default=10)
+    parser.add_argument("-rl", "--relabel", required=False, action='store_true',
+                        help="Relabel network nodes from 0 to #nodes-1.", default=False)
 
     args = parser.parse_args()
     net = nx.read_edgelist(args.edgelist, nodetype=int)
+
+    # relabeling nodes from 0 to n-1
+    if args.relabel:
+        mapping = dict(zip(net, range(0, net.number_of_nodes())))
+        net = nx.relabel_nodes(net, mapping)
+
     n_p = args.partitions
     #leiden_alg_list = ['leiden-cpm'] * n_p
-    lou_lei_alg_list = ['louvain'] * int(n_p / 2) + ['leiden-cpm'] * (n_p - int(n_p / 2))
+    lou_lei_alg_list = ['leiden-mod'] * int(n_p / 2) + ['leiden-cpm'] * (n_p - int(n_p / 2))
     sc = simple_consensus(net, lou_lei_alg_list, [args.resolution] * n_p, [1] * n_p, args.threshold)
 
     with open('sc_'+str(args.threshold)+'_'+args.edgelist.split('/')[-1], 'w') as out_file:

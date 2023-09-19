@@ -14,6 +14,7 @@ $ python3 threshold_consensus.py -n <edge-list> -t <threshold> -a <algorithm> -r
  -a,  --algorithm          clustering algorithm (leiden-cpm, leiden-mod, louvain)
  -r,  --resolution         resolution value for leiden-cpm
  -p,  --partitions         number of partitions used in consensus clustering
+ -rl, --relabel            relabel network nodes from 0 to #nodes-1
 ```
 ### Simple consensus
 See description in the report. This does not yet support IKC and strict consensus in the final step and the algorithm list should be set manually in the code. The best-scoring selection in the final step is also not included yet, and the first algorithm in the list will be used to create the final partition.
@@ -29,6 +30,7 @@ $ python3 simple_consensus.py -n <edge-list> -t <threshold> -r <resolution-value
  -p,  --partitions         number of partitions used in consensus clustering
  -d,  --delta              convergence parameter
  -p,  --maxiter            maximum number of iterations
+ -rl, --relabel            relabel network nodes from 0 to #nodes-1
 ```
 The script `evaluate_partition.py` can be used to evaluate the output partition in terms of cluster statistics and modularity:
 ```

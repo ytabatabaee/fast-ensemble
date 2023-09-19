@@ -74,8 +74,17 @@ if __name__ == "__main__":
                         help="Resolution value for leiden-cpm", default=0.01)
     parser.add_argument("-p", "--partitions", type=int, required=False,
                         help="Number of partitions in consensus clustering", default=10)
+    parser.add_argument("-rl", "--relabel", required=False, action='store_true',
+                        help="Relabel network nodes from 0 to #nodes-1.", default=False)
+    
     args = parser.parse_args()
     net = nx.read_edgelist(args.edgelist, nodetype=int)
+
+    # relabeling nodes from 0 to n-1
+    if args.relabel:
+        mapping = dict(zip(net, range(0, net.number_of_nodes())))
+        net = nx.relabel_nodes(net, mapping)
+
     tc = threshold_consensus(net, args.algorithm.lower(), args.partitions, args.threshold, args.resolution)
     with open('tc_'+str(args.threshold)+'_'+args.edgelist.split('/')[-1], 'w') as out_file:
         writer = csv.writer(out_file, delimiter=' ')
