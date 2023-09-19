@@ -16,9 +16,6 @@ import datetime
 from enum import Enum
 
 
-START_TIME = time.monotonic()
-GLOBAL_LOG_FILE = None
-GLOBAL_LOG_LOCK = mp.Lock()
 
 def communities_to_dict(communities):
     result = {}
@@ -32,28 +29,28 @@ def communities_to_dict(communities):
 def get_communities_wrapper(args):
     return get_communities(*args)
 
-def get_communities(edgelist, algorithm, seed, r=0.001, graph=None):
-    write_to_log_file("get_communities() called with {algorithm} and seed={seed}\n")
+def get_communities(edgelist, algorithm, seed, r, graph):
+    write_to_log_file(f"get_communities() called with {algorithm} and seed={seed}\n")
     if not graph:
         graph = nx.read_edgelist(edgelist, nodetype=int)
         nx.set_edge_attributes(graph, values=1, name="weight")
     if algorithm == 'louvain':
         partition = cl.best_partition(graph, random_state=seed, weight='weight')
-        write_to_log_file("get_communities() finished with {algorithm} and seed={seed}\n")
+        write_to_log_file(f"get_communities() finished with {algorithm} and seed={seed}\n")
         return partition
     elif algorithm == 'leiden-cpm':
         partition = communities_to_dict(leidenalg.find_partition(ig.Graph.from_networkx(graph),
                                                   leidenalg.CPMVertexPartition,
                                                   resolution_parameter=r,
                                                   n_iterations=2).as_cover())
-        write_to_log_file("get_communities() finished with {algorithm} and seed={seed}\n")
+        write_to_log_file(f"get_communities() finished with {algorithm} and seed={seed}\n")
         return partition
     elif algorithm == 'leiden-mod':
         partition = communities_to_dict(leidenalg.find_partition(ig.Graph.from_networkx(graph),
                                         leidenalg.ModularityVertexPartition,
                                         weights='weight',
                                         seed=seed).as_cover())
-        write_to_log_file("get_communities() finished with {algorithm} and seed={seed}\n")
+        write_to_log_file(f"get_communities() finished with {algorithm} and seed={seed}\n")
         return partition
     raise ValueError(f"{algorithm} not implemented in get_communities()")
 
@@ -109,49 +106,52 @@ def threshold_consensus(edgelist, num_processors, threshold, algorithm, resoluti
     # creating pool
     pool = mp.Pool(num_processors)
     args_arr = []
-    write_to_log_file("Worker pool with {num_processors} created")
+    write_to_log_file(f"Worker pool with {num_processors} created")
     for i in range(num_partitions):
-        current_args = (edgelist, algorithm, i, resolution)
+        current_args = (edgelist, algorithm, i, resolution, None)
         args_arr.append(current_args)
     # assigning workers
-    write_to_log_file("Starting workers")
+    write_to_log_file(f"Starting workers")
     results = pool.map(get_communities_wrapper, args_arr)
-    write_to_log_file("All workers finised")
+    write_to_log_file(f"All workers finised")
 
 
     ## final clustering
     # final graph setup
-    write_to_log_file("Started reading graph for the final clustering")
+    write_to_log_file(f"Started reading graph for the final clustering")
     graph = nx.read_edgelist(edgelist, nodetype=int)
-    write_to_log_file("Finished reading graph for the final clustering")
-    write_to_log_file("Started setting edge weights for the final graph")
+    write_to_log_file(f"Finished reading graph for the final clustering")
+    write_to_log_file(f"Started setting edge weights for the final graph")
     nx.set_edge_attributes(graph, values=1, name="weight")
-    write_to_log_file("Finished setting edge weights for the final graph")
+    write_to_log_file(f"Finished setting edge weights for the final graph")
 
     # final graph edgeweight manipulation
-    write_to_log_file("Started subtracting edge weights for the final graph")
+    write_to_log_file(f"Started subtracting edge weights for the final graph")
     for c in results:
         for node, nbr in graph.edges():
             if c[node] != c[nbr]:
                 graph[node][nbr]['weight'] -= 1/num_partitions
-    write_to_log_file("Finished subtracting edge weights for the final graph")
+    write_to_log_file(f"Finished subtracting edge weights for the final graph")
 
     # final graph edgeweight manipulation part 2
-    write_to_log_file("Started thresholding for the final graph")
+    write_to_log_file(f"Started thresholding for the final graph")
     graph = thresholding(graph, threshold)
-    write_to_log_file("Finished thresholding for the final graph")
+    write_to_log_file(f"Finished thresholding for the final graph")
 
     # computing final clustering
     seed = 0
-    tc = get_communities("", algorithm, seed, graph=graph)
+    tc = get_communities(None, algorithm, seed, resolution, graph)
 
     # writing final clustering
-    write_to_log_file("Started writing the final output clustering")
+    write_to_log_file(f"Started writing the final output clustering")
     with open(f"{output_file}", "w") as f:
         for node, mem in tc.items():
             f.write(f"{node} {mem}\n")
-    write_to_log_file("Finished writing the final output clustering")
+    write_to_log_file(f"Finished writing the final output clustering")
     GLOBAL_LOG_FILE.close()
 
 if __name__ == "__main__":
+    START_TIME = time.monotonic()
+    GLOBAL_LOG_FILE = None
+    GLOBAL_LOG_LOCK = mp.Lock()
     threshold_consensus()
