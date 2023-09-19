@@ -5,6 +5,12 @@ import argparse
 import csv
 import community.community_louvain as cl
 import numpy as np
+import subprocess
+import multiprocessing
+from pathlib import Path
+from multiprocessing import Pool
+import shlex
+import click
 
 
 def communities_to_dict(communities):
@@ -16,7 +22,13 @@ def communities_to_dict(communities):
         community_index += 1
     return result
 
-def get_communities(graph, algorithm, seed, r=0.001):
+def get_communities_wrapper(args):
+    return get_communities(*args)
+
+def get_communities(edgelist, algorithm, seed, r=0.001, graph=None):
+    if not graph:
+        graph = nx.read_edgelist(edgelist, nodetype=int)
+        nx.set_edge_attributes(graph, values=1, name="weight")
     if algorithm == 'louvain':
         return cl.best_partition(graph, random_state=seed, weight='weight')
     elif algorithm == 'leiden-cpm':
@@ -29,11 +41,7 @@ def get_communities(graph, algorithm, seed, r=0.001):
                                         leidenalg.ModularityVertexPartition,
                                         weights='weight',
                                         seed=seed).as_cover())
-
-def initialize(graph, value):
-    for u, v in graph.edges():
-        graph[u][v]['weight'] = value
-    return graph
+    raise ValueError(f"{algorithm} not implemented in get_communities()")
 
 
 def thresholding(graph, thresh):
@@ -46,39 +54,37 @@ def thresholding(graph, thresh):
     return graph
 
 # strict consensus can be achieved by running threshold consensus with tr=1
-def threshold_consensus(G, algorithm='leiden-cpm', n_p=20, tr=1, r=0.001):
-    graph = G.copy()
-    graph = initialize(graph, 1)
-    iter_count = 0
+@click.command()
+@click.option("--edgelist", "-n", type=click.Path(exists=True), required=True, help="Network edge-list file")
+@click.option("--num-processors", type=int, default=1, help="Number of parallel workers for the partitions")
+@click.option("--threshold", "-t", type=float, default=1.0, required=True, help="Threshold value")
+@click.option("--algorithm", "-a", type=click.Choice(["leiden-cpm", "leiden-mod", "louvain"]), default="leiden-cpm", required=True, help="Clustering algorithm")
+@click.option("--resolution", "-r", type=float, default=0.01, help="Resolution value for ledien-cpm")
+@click.option("--num-partitions", "-p", type=int, default=10, help="Number of partitions in consensus clustering")
+@click.option("--output-file", type=click.Path(), required=True, help="Output clustering file")
+def threshold_consensus(edgelist, num_processors, threshold, algorithm, resolution, num_partitions, output_file):
+    pool = Pool(num_processors)
+    args_arr = []
 
-    partitions = [get_communities(graph, algorithm, i, r) for i in range(n_p)]
+    for i in range(num_partitions):
+        current_args = (edgelist, algorithm, i, resolution)
+        args_arr.append(current_args)
+    results = pool.map(get_communities_wrapper, args_arr)
 
-    for i in range(n_p):
-        c = partitions[i]
+    graph = nx.read_edgelist(edgelist, nodetype=int)
+    nx.set_edge_attributes(graph, values=1, name="weight")
+
+    for c in results:
         for node, nbr in graph.edges():
             if c[node] != c[nbr]:
-                graph[node][nbr]['weight'] -= 1/n_p
+                graph[node][nbr]['weight'] -= 1/num_partitions
 
-    graph = thresholding(graph, tr)
-    return get_communities(graph, algorithm, 0)
+    graph = thresholding(graph, threshold)
+    seed = 0
+    tc = get_communities("", algorithm, seed, graph=graph)
+    with open(f"{output_file}", "w") as f:
+        for node, mem in tc.items():
+            f.write(f"{node} {mem}\n")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Threshold Consensus")
-    parser.add_argument("-n", "--edgelist", type=str,  required=True,
-                        help="Network edge-list file")
-    parser.add_argument("-t", "--threshold", type=float, required=False,
-                        help="Threshold value", default=1.0)
-    parser.add_argument("-a", "--algorithm", type=str, required=False,
-                        help="Clustering algorithm (leiden-cpm, leiden-mod, louvain)", default='leiden-cpm')
-    parser.add_argument("-r", "--resolution", type=float, required=False,
-                        help="Resolution value for leiden-cpm", default=0.01)
-    parser.add_argument("-p", "--partitions", type=int, required=False,
-                        help="Number of partitions in consensus clustering", default=10)
-    args = parser.parse_args()
-    net = nx.read_edgelist(args.edgelist, nodetype=int)
-    tc = threshold_consensus(net, args.algorithm.lower(), args.partitions, args.threshold, args.resolution)
-    with open('tc_'+str(args.threshold)+'_'+args.edgelist.split('/')[-1], 'w') as out_file:
-        writer = csv.writer(out_file, delimiter=' ')
-        for node, mem in tc.items():
-            writer.writerow([node]+[mem])
-
+    threshold_consensus()
