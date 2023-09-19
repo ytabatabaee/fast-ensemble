@@ -1,68 +1,22 @@
-import leidenalg
-import networkx as nx
-import igraph as ig
 import argparse
 import csv
-import community.community_louvain as cl
-import numpy as np
-import subprocess
+import datetime
 import multiprocessing
-from pathlib import Path
 import multiprocessing as mp
 import shlex
-import click
+import subprocess
 import time
-import datetime
 from enum import Enum
+from pathlib import Path
+
+import click
+import community.community_louvain as cl
+import igraph as ig
+import leidenalg
+import networkx as nx
+import numpy as np
 
 
-
-def communities_to_dict(communities):
-    result = {}
-    community_index = 0
-    for c in communities:
-        community_mapping = ({node: community_index for index, node in enumerate(c)})
-        result = {**result, **community_mapping}
-        community_index += 1
-    return result
-
-def get_communities_wrapper(args):
-    return get_communities(*args)
-
-def get_communities(edgelist, algorithm, seed, r, graph):
-    write_to_log_file(f"get_communities() called with {algorithm} and seed={seed}\n")
-    if not graph:
-        graph = nx.read_edgelist(edgelist, nodetype=int)
-        nx.set_edge_attributes(graph, values=1, name="weight")
-    if algorithm == 'louvain':
-        partition = cl.best_partition(graph, random_state=seed, weight='weight')
-        write_to_log_file(f"get_communities() finished with {algorithm} and seed={seed}\n")
-        return partition
-    elif algorithm == 'leiden-cpm':
-        partition = communities_to_dict(leidenalg.find_partition(ig.Graph.from_networkx(graph),
-                                                  leidenalg.CPMVertexPartition,
-                                                  resolution_parameter=r,
-                                                  n_iterations=2).as_cover())
-        write_to_log_file(f"get_communities() finished with {algorithm} and seed={seed}\n")
-        return partition
-    elif algorithm == 'leiden-mod':
-        partition = communities_to_dict(leidenalg.find_partition(ig.Graph.from_networkx(graph),
-                                        leidenalg.ModularityVertexPartition,
-                                        weights='weight',
-                                        seed=seed).as_cover())
-        write_to_log_file(f"get_communities() finished with {algorithm} and seed={seed}\n")
-        return partition
-    raise ValueError(f"{algorithm} not implemented in get_communities()")
-
-
-def thresholding(graph, thresh):
-    remove_edges = []
-    bound = thresh
-    for u, v in graph.edges():
-        if graph[u][v]['weight'] < bound:
-            remove_edges.append((u, v))
-    graph.remove_edges_from(remove_edges)
-    return graph
 
 class LogLevel(Enum):
     INFO = 0
@@ -80,8 +34,69 @@ def write_to_log_file(message, level=LogLevel.INFO):
         GLOBAL_LOG_FILE.write(f"[INFO] t={seconds_elapsed} ({human_readable_time_elapsed}): {message}\n")
     elif(level == LogLevel.ERROR):
         GLOBAL_LOG_FILE.write(f"[ERROR] t={seconds_elapsed} ({human_readable_time_elapsed}): {message}\n")
+    GLOBAL_LOG_FILE.flush()
 
-# strict consensus can be achieved by running threshold consensus with tr=1
+def communities_to_dict(communities):
+    result = {}
+    community_index = 0
+    for c in communities:
+        community_mapping = ({node: community_index for index, node in enumerate(c)})
+        result = {**result, **community_mapping}
+        community_index += 1
+    return result
+
+def get_communities_wrapper(args):
+    return get_communities(*args)
+
+def get_communities(edgelist, algorithm, seed, r, graph):
+    write_to_log_file(f"get_communities() called with {algorithm} and seed={seed}")
+    partition = {}
+    relabelled_partition = None
+    relabelled_graph = None
+    if not graph:
+        graph = nx.read_edgelist(edgelist, nodetype=int)
+        nx.set_edge_attributes(graph, values=1, name="weight")
+    if algorithm == 'louvain':
+        partition = cl.best_partition(graph, random_state=seed, weight='weight')
+        write_to_log_file(f"get_communities() finished with {algorithm} and seed={seed}")
+    elif algorithm == 'leiden-cpm':
+        relabelled_graph = ig.Graph.from_networkx(graph)
+        relabelled_partition = communities_to_dict(leidenalg.find_partition(relabelled_graph,
+                                                  leidenalg.CPMVertexPartition,
+                                                  resolution_parameter=r,
+                                                  n_iterations=2).as_cover())
+        write_to_log_file(f"get_communities() finished with {algorithm} and seed={seed}")
+    elif algorithm == 'leiden-mod':
+        relabelled_graph = ig.Graph.from_networkx(graph)
+        relabelled_partition = communities_to_dict(leidenalg.find_partition(relabelled_graph,
+                                        leidenalg.ModularityVertexPartition,
+                                        weights='weight',
+                                        seed=seed).as_cover())
+        write_to_log_file(f"get_communities() finished with {algorithm} and seed={seed}")
+
+    if  not partition and relabelled_graph and relabelled_partition:
+        write_to_log_file(f"starting un-relabelling nodes {algorithm} and seed={seed}")
+        for igraph_index,vertex in enumerate(relabelled_graph.vs):
+            vertex_attributes = vertex.attributes()
+            original_id = vertex_attributes["_nx_name"]
+            relabelled_id = igraph_index
+            partition[original_id] = relabelled_partition[relabelled_id]
+        write_to_log_file(f"finished un-relabelling nodes {algorithm} and seed={seed}")
+        return partition
+    elif partition and not relabelled_graph and not relabelled_partition:
+        return partition
+    else:
+        raise Exception("get_communities() went wrong")
+
+def thresholding(graph, thresh):
+    remove_edges = []
+    bound = thresh
+    for u, v in graph.edges():
+        if graph[u][v]['weight'] < bound:
+            remove_edges.append((u, v))
+    graph.remove_edges_from(remove_edges)
+    return graph
+
 @click.command()
 @click.option("--edgelist", "-n", type=click.Path(exists=True), required=True, help="Network edge-list file")
 @click.option("--num-processors", type=int, default=1, help="Number of parallel workers for the partitions")
@@ -100,6 +115,7 @@ def threshold_consensus(edgelist, num_processors, threshold, algorithm, resoluti
         GLOBAL_LOG_FILE = open(f"{log_file}", "w")
         GLOBAL_LOG_FILE.write(f"# This log file starts at time t = 0\n")
         GLOBAL_LOG_FILE.write(f"# format is [INFO/ERROR] t=<seconds elapsed> (<human readable time since start>): <message>\n")
+        GLOBAL_LOG_FILE.flush()
 
 
     ## worker setup
