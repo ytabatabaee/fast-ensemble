@@ -17,15 +17,6 @@ def check_convergence(G, n_p, delta):
         return False
     return True
 
-def communities_to_dict(communities):
-    result = {}
-    community_index = 0
-    for c in communities:
-        community_mapping = ({node: community_index for index, node in enumerate(c)})
-        result = {**result, **community_mapping}
-        community_index += 1
-    return result
-
 
 def thresholding(graph, n_p, thresh):
     remove_edges = []
@@ -46,15 +37,15 @@ def get_communities(graph, algorithm, seed, r=0.001):
     if algorithm == 'louvain':
         return cl.best_partition(graph, random_state=seed, weight='weight')
     elif algorithm == 'leiden-cpm':
-        return communities_to_dict(leidenalg.find_partition(ig.Graph.from_networkx(graph),
+        return dict(enumerate(leidenalg.find_partition(ig.Graph.from_networkx(graph),
                                                   leidenalg.CPMVertexPartition,
                                                   resolution_parameter=r,
-                                                  n_iterations=2).as_cover())
+                                                  n_iterations=2).membership))
     elif algorithm == 'leiden-mod':
-        return communities_to_dict(leidenalg.find_partition(ig.Graph.from_networkx(graph),
+        return dict(enumerate(leidenalg.find_partition(ig.Graph.from_networkx(graph),
                                         leidenalg.ModularityVertexPartition,
                                         weights='weight',
-                                        seed=seed).as_cover())
+                                        seed=seed).membership))
 
 
 def simple_consensus(G, alg_list, param_list, weight_list, thresh=0.2, delta=0.02, max_iter=10):
@@ -96,7 +87,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--edgelist", type=str,  required=True,
                         help="Network edge-list file")
     parser.add_argument("-t", "--threshold", type=float, required=False,
-                        help="Threshold value", default=1.0)
+                        help="Threshold value", default=0.2)
     parser.add_argument("-r", "--resolution", type=float, required=False,
                         help="Resolution value for leiden-cpm", default=0.01)
     parser.add_argument("-p", "--partitions", type=int, required=False,

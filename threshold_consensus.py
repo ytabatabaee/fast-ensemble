@@ -7,28 +7,20 @@ import community.community_louvain as cl
 import numpy as np
 
 
-def communities_to_dict(communities):
-    result = {}
-    community_index = 0
-    for c in communities:
-        community_mapping = ({node: community_index for index, node in enumerate(c)})
-        result = {**result, **community_mapping}
-        community_index += 1
-    return result
-
 def get_communities(graph, algorithm, seed, r=0.001):
     if algorithm == 'louvain':
         return cl.best_partition(graph, random_state=seed, weight='weight')
     elif algorithm == 'leiden-cpm':
-        return communities_to_dict(leidenalg.find_partition(ig.Graph.from_networkx(graph),
+        return dict(enumerate(leidenalg.find_partition(ig.Graph.from_networkx(graph),
                                                   leidenalg.CPMVertexPartition,
                                                   resolution_parameter=r,
-                                                  n_iterations=2).as_cover())
+                                                  n_iterations=2).membership))
     elif algorithm == 'leiden-mod':
-        return communities_to_dict(leidenalg.find_partition(ig.Graph.from_networkx(graph),
+        return dict(enumerate(leidenalg.find_partition(ig.Graph.from_networkx(graph),
                                         leidenalg.ModularityVertexPartition,
                                         weights='weight',
-                                        seed=seed).as_cover())
+                                        seed=seed).membership))
+
 
 def initialize(graph, value):
     for u, v in graph.edges():
@@ -44,6 +36,7 @@ def thresholding(graph, thresh):
             remove_edges.append((u, v))
     graph.remove_edges_from(remove_edges)
     return graph
+
 
 # strict consensus can be achieved by running threshold consensus with tr=1
 def threshold_consensus(G, algorithm='leiden-cpm', n_p=20, tr=1, r=0.001):
@@ -61,6 +54,7 @@ def threshold_consensus(G, algorithm='leiden-cpm', n_p=20, tr=1, r=0.001):
 
     graph = thresholding(graph, tr)
     return get_communities(graph, algorithm, 0)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Threshold Consensus")
