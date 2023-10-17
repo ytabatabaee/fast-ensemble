@@ -5,21 +5,24 @@ import argparse
 import csv
 import community.community_louvain as cl
 import numpy as np
+import time
 
 
 def get_communities(graph, algorithm, seed, r=0.001):
     if algorithm == 'louvain':
         return cl.best_partition(graph, random_state=seed, weight='weight')
     elif algorithm == 'leiden-cpm':
-        return dict(enumerate(leidenalg.find_partition(ig.Graph.from_networkx(graph),
+        leiden_out = leidenalg.find_partition(ig.Graph.from_networkx(graph),
                                                   leidenalg.CPMVertexPartition,
                                                   resolution_parameter=r,
-                                                  n_iterations=2).membership))
+                                                  n_iterations=2).membership
+        return leiden_out
     elif algorithm == 'leiden-mod':
-        return dict(enumerate(leidenalg.find_partition(ig.Graph.from_networkx(graph),
+        leiden_out = leidenalg.find_partition(ig.Graph.from_networkx(graph),
                                         leidenalg.ModularityVertexPartition,
                                         weights='weight',
-                                        seed=seed).membership))
+                                        seed=seed).membership
+        return leiden_out
 
 
 def initialize(graph, value):
@@ -28,31 +31,37 @@ def initialize(graph, value):
     return graph
 
 
-def thresholding(graph, thresh):
+'''def thresholding(graph, thresh):
     remove_edges = []
     bound = thresh
     for u, v in graph.edges():
         if graph[u][v]['weight'] < bound:
             remove_edges.append((u, v))
     graph.remove_edges_from(remove_edges)
-    return graph
+    return graph'''
 
 
 # strict consensus can be achieved by running threshold consensus with tr=1
 def threshold_consensus(G, algorithm='leiden-cpm', n_p=20, tr=1, r=0.001):
     graph = G.copy()
     graph = initialize(graph, 1)
-    iter_count = 0
 
+    start_time = time.time()
     partitions = [get_communities(graph, algorithm, i, r) for i in range(n_p)]
+    print('time to compute communities:', time.time() - start_time)
+    start_time = time.time()
 
-    for i in range(n_p):
-        c = partitions[i]
-        for node, nbr in graph.edges():
-            if c[node] != c[nbr]:
+    remove_edges = []
+    for node, nbr in graph.edges():
+        for i in range(n_p):
+            if partitions[i][node] != partitions[i][nbr]:
                 graph[node][nbr]['weight'] -= 1/n_p
+            if graph[node][nbr]['weight'] < tr:
+                remove_edges.append((node, nbr))
+                break
+    graph.remove_edges_from(remove_edges)
 
-    graph = thresholding(graph, tr)
+    print('time to compute matrix and thresholding:', time.time() - start_time)
     return get_communities(graph, algorithm, 0)
 
 
@@ -78,10 +87,15 @@ if __name__ == "__main__":
     if args.relabel:
         mapping = dict(zip(net, range(0, net.number_of_nodes())))
         net = nx.relabel_nodes(net, mapping)
+        reverse_mapping = {y: x for x, y in mapping.items()}
 
     tc = threshold_consensus(net, args.algorithm.lower(), args.partitions, args.threshold, args.resolution)
     with open('tc_'+str(args.threshold)+'_'+args.edgelist.split('/')[-1], 'w') as out_file:
         writer = csv.writer(out_file, delimiter=' ')
-        for node, mem in tc.items():
-            writer.writerow([node]+[mem])
+        for i in range(len(tc)):
+            if args.relabel:
+                writer.writerow([reverse_mapping[i]]+[tc[i]])
+            else:
+                writer.writerow([i] + [tc[i]])
+
 

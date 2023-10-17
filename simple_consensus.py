@@ -6,6 +6,7 @@ import numpy as np
 import argparse
 import community.community_louvain as cl
 from networkx.algorithms.community import modularity
+import time
 
 
 def check_convergence(G, n_p, delta):
@@ -37,15 +38,15 @@ def get_communities(graph, algorithm, seed, r=0.001):
     if algorithm == 'louvain':
         return cl.best_partition(graph, random_state=seed, weight='weight')
     elif algorithm == 'leiden-cpm':
-        return dict(enumerate(leidenalg.find_partition(ig.Graph.from_networkx(graph),
+        return leidenalg.find_partition(ig.Graph.from_networkx(graph),
                                                   leidenalg.CPMVertexPartition,
                                                   resolution_parameter=r,
-                                                  n_iterations=2).membership))
+                                                  n_iterations=2).membership
     elif algorithm == 'leiden-mod':
-        return dict(enumerate(leidenalg.find_partition(ig.Graph.from_networkx(graph),
+        return leidenalg.find_partition(ig.Graph.from_networkx(graph),
                                         leidenalg.ModularityVertexPartition,
                                         weights='weight',
-                                        seed=seed).membership))
+                                        seed=seed).membership
 
 
 def simple_consensus(G, alg_list, param_list, weight_list, thresh=0.2, delta=0.02, max_iter=10):
@@ -63,7 +64,11 @@ def simple_consensus(G, alg_list, param_list, weight_list, thresh=0.2, delta=0.0
         nextgraph = graph.copy()
         nextgraph = initialize(nextgraph, 0.0)
 
+        start_time = time.time()
         communities = [get_communities(graph, alg_list[i], i, param_list[i]) for i in range(len(alg_list))]
+        print('time to compute communities:', time.time() - start_time)
+        start_time = time.time()
+
         for i in range(n_p):
             c = communities[i]
             for node, nbr in graph.edges():
@@ -77,6 +82,7 @@ def simple_consensus(G, alg_list, param_list, weight_list, thresh=0.2, delta=0.0
         if check_convergence(nextgraph, n_p=n_p_max, delta=delta):
             break
         graph = nextgraph.copy()
+        print('time to compute matrix and thresholding:', time.time() - start_time)
 
     print('number of iterations:', iter_count)
     return get_communities(graph, alg_list[0], 0, param_list[0])
@@ -106,6 +112,7 @@ if __name__ == "__main__":
     if args.relabel:
         mapping = dict(zip(net, range(0, net.number_of_nodes())))
         net = nx.relabel_nodes(net, mapping)
+        reverse_mapping = {y: x for x, y in mapping.items()}
 
     n_p = args.partitions
     #leiden_alg_list = ['leiden-cpm'] * n_p
@@ -114,5 +121,8 @@ if __name__ == "__main__":
 
     with open('sc_'+str(args.threshold)+'_'+args.edgelist.split('/')[-1], 'w') as out_file:
         writer = csv.writer(out_file, delimiter=' ')
-        for node, mem in sc.items():
-            writer.writerow([node]+[mem])
+        for i in range(len(sc)):
+            if args.relabel:
+                writer.writerow([reverse_mapping[i]] + [sc[i]])
+            else:
+                writer.writerow([i] + [sc[i]])
