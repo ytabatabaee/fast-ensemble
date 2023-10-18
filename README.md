@@ -36,3 +36,10 @@ The script `evaluate_partition.py` can be used to evaluate the output partition 
 ```
 $ python3 evaluate_partition.py -n <edge-list> -m <partition-membership>
 ```
+
+### Calculating accuracy
+The script `clustering_accuracy.py` can be used for computing multiple accuracy measures (NMI, AMI, ARI, false positive rate, false negative rate, precision, recall and F1-score) for a clustering with respect to a ground-truth community membership. 
+```
+$ python3 clustering_accuracy.py -gt <ground-truth-membership> -p <estimated-partition>
+```
+
