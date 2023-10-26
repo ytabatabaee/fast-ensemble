@@ -9,13 +9,15 @@ import time
 
 
 def get_communities(graph, algorithm, seed, r=0.001):
+    '''
     if algorithm == 'louvain':
         return cl.best_partition(graph, random_state=seed, weight='weight')
     elif algorithm == 'leiden-cpm':
         leiden_out = leidenalg.find_partition(ig.Graph.from_networkx(graph),
                                                   leidenalg.CPMVertexPartition,
                                                   resolution_parameter=r,
-                                                  n_iterations=2).membership
+                                                  n_iterations=1,
+                                                  seed=seed).membership
         return leiden_out
     elif algorithm == 'leiden-mod':
         leiden_out = leidenalg.find_partition(ig.Graph.from_networkx(graph),
@@ -23,6 +25,29 @@ def get_communities(graph, algorithm, seed, r=0.001):
                                         weights='weight',
                                         seed=seed).membership
         return leiden_out
+    '''
+    if algorithm == 'louvain':
+        return cl.best_partition(graph, random_state=seed, weight='weight')
+    elif algorithm == 'leiden-cpm':
+        relabelled_graph = ig.Graph.from_networkx(graph)
+        networkx_node_id_dict = {}
+        igraph_node_id_dict = leidenalg.find_partition(relabelled_graph, leidenalg.CPMVertexPartition, resolution_parameter=r, n_iterations=1, seed=seed).membership
+        for igraph_index,vertex in enumerate(relabelled_graph.vs):
+            vertex_attributes = vertex.attributes()
+            original_id = int(vertex_attributes["_nx_name"])
+            relabelled_id = int(igraph_index)
+            networkx_node_id_dict[original_id] = igraph_node_id_dict[relabelled_id]
+        return networkx_node_id_dict
+    elif algorithm == 'leiden-mod':
+        relabelled_graph = ig.Graph.from_networkx(graph)
+        networkx_node_id_dict = {}
+        igraph_node_id_dict = leidenalg.find_partition(relabelled_graph, leidenalg.ModularityVertexPartition, weights='weight', n_iterations=-1, seed=seed).membership
+        for igraph_index,vertex in enumerate(relabelled_graph.vs):
+            vertex_attributes = vertex.attributes()
+            original_id = int(vertex_attributes["_nx_name"])
+            relabelled_id = int(igraph_index)
+            networkx_node_id_dict[original_id] = igraph_node_id_dict[relabelled_id]
+        return networkx_node_id_dict
 
 
 def initialize(graph, value):

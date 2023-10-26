@@ -1,0 +1,1 @@
+python ./threshold_consensus.py -n ./toy-examples/tc_1.0_ring_cliques_100_10.tsv -a leiden-cpm -r 0.01 -p 2
