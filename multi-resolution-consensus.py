@@ -9,23 +9,32 @@ import community.community_louvain as cl
 from networkx.algorithms.community import modularity
 
 
-def check_convergence(G, n_p, delta):
-    print (delta)
-    count = 0
-    for wt in nx.get_edge_attributes(G, 'weight').values():
-        if wt != 0 and wt != n_p:
-            count += 1
-    print (count, delta * G.number_of_edges())
-    if count > delta * G.number_of_edges():
-        return False
-    return True
+def check_convergence(G, NG, n_p, delta):
+    #print (delta)
+    #count = 0
+    #for wt in nx.get_edge_attributes(G, 'weight').values():
+    #    if wt != 0 and wt != n_p:
+    #        count += 1
+    
+    #print (count, delta * G.number_of_edges())
+    if nx.utils.graphs_equal(NG,G):
+    #if count > delta * G.number_of_edges():
+        return True
+    return False
 
 
 def thresholding(graph, n_p, thresh):
 
     remove_edges = []
     for u, v in graph.edges():
-        if graph[u][v]['weight'] < thresh * n_p:
+        if graph[u][v]['weight'] < thresh * n_p: 
+        # an edge weight represents the proportion of partitions the two nodes are clustered together
+            # .3*3=.9->remove edges with weight 0 ie in no partitions together
+            #          -> only keep if in at least 1 partition                   
+            # .6*3=1.8->remove edges with weight 0 or 1 ie in 0 or 1 partition together 
+            #          -> only keep if in at least 2 partitions            
+            # .9*3=2.7->remove edges with weight 0 1 or 2 ie in 0 1 or 2 partitions togehter 
+            #          -> only keep if in all partitions
             remove_edges.append((u, v))
     graph.remove_edges_from(remove_edges)
     return graph
@@ -80,7 +89,6 @@ def simple_consensus(G, alg_list, param_list, weight_list, thresh=0.2, delta=0.0
         communities = [get_communities(graph, alg_list[i], i, param_list[i]) for i in range(len(alg_list))]
         for i in range(n_p):
             c = communities[i]
-            
             for node, nbr in graph.edges():
                 if graph[node][nbr]['weight'] not in (0, n_p_max):
                     if c[node] == c[nbr]:
@@ -90,9 +98,12 @@ def simple_consensus(G, alg_list, param_list, weight_list, thresh=0.2, delta=0.0
 
         nextgraph = thresholding(nextgraph, n_p_max, thresh)
         print (nx.number_connected_components(nextgraph))
-        graph = nextgraph.copy()
-        if check_convergence(nextgraph, n_p=n_p_max, delta=delta):
+
+        if check_convergence(graph, nextgraph, n_p=n_p_max, delta=delta):
+            graph = nextgraph.copy()
             break
+        
+        graph = nextgraph.copy()
 
     #nx.draw(graph)
     #plt.show()
@@ -123,7 +134,6 @@ if __name__ == "__main__":
     # relabeling nodes from 0 to n-1
     if args.relabel:
         mapping = dict(zip(net, range(0, net.number_of_nodes())))
-
         net = nx.relabel_nodes(net, mapping)
         reverse_mapping = {y: x for x, y in mapping.items()}
         
