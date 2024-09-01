@@ -1,11 +1,24 @@
-# Consensus clustering
+# Fast Ensemble Clustering
 
-This respository includes Simple Consensus (SC) and Threshold Consensus (TC). The algorithms and the codes use many ideas from the Fast Consensus Clustering software available at https://github.com/kaiser-dan/fastconsensus and the paper [Fast consensus clustering in complex networks](https://arxiv.org/pdf/1902.04014.pdf), Phys. Rev. E., 2019.
+This respository includes a python implementation of *FastEnsemble* clustering. 
 
-### Threshold consensus
-This implementation of the Threshold Consensus runs a clustering algorithm $n_p$ times with different random seeds in a single iteration and only keeps the edges that appear in at least $\tau$ proportion of the partitions. When $\tau=1$, this is equivalent to *strict* consensus.
+
+In its simplest form, *FastEnsemble* uses three main parameters: the clustering method, the number of partitions $np$, and the threshold $t$. Given an input matrix $N$, *FastEnsemble* uses the specified clustering method to generate $n_p$ partitions of $N$, and then builds a new network on the same node and edge set but with the edges weighted by the number of partitions the endpoints are in the same cluster. If a given edge has weight less than $t \times np$ (indicating that its endpoints are co-clustered in fewer than that many partitions), then the edge is removed from the network; hence the new network can have fewer edges than the original network.   The new weighted network is then clustered just once more using the selected clustering method.
+
+*FastEnsemble* can be used with one or a combination of clustering paradigms, and we have implemented it for use with Leiden optimizing CPM, Leiden optimizing modularity, Louvain, and other methods. This implementation also allows the constituent clustering methods to be weighted, so that some clustering methods have more influence than the others.
+
+## Dependencies
+*FastEnsemble* is implemented in Python 3 and have the following dependencies:
+- [Python 3.x](https://www.python.org)
+- [NetworkX](https://networkx.org)
+- [Numpy](https://numpy.org)
+
+If you have Python 3 and pip, you can use `pip install -r requirements.txt` to install the other dependencies. 
+
+## Usage Instructions
+*FastEnsemble* can be run with the following command:
 ```
-$ python3 threshold_consensus.py -n <edge-list> -t <threshold> -a <algorithm> -r <resolution-value> -p <number-partitions>
+$ python3 fast_ensemble.py -n <edge-list> -t <threshold> -a <algorithm> [-r <resolution-value>] -p <number-of-partitions>
 ```
 **Arguments**
 ```
@@ -16,23 +29,11 @@ $ python3 threshold_consensus.py -n <edge-list> -t <threshold> -a <algorithm> -r
  -p,  --partitions         number of partitions used in consensus clustering
  -rl, --relabel            relabel network nodes from 0 to #nodes-1
 ```
-### Simple consensus
-See description in the report. This does not yet support IKC and strict consensus in the final step and the algorithm list should be set manually in the code. The best-scoring selection in the final step is also not included yet, and the first algorithm in the list will be used to create the final partition.
-```
-$ python3 simple_consensus.py -n <edge-list> -t <threshold> -r <resolution-value> -p <number-partitions>
-```
-**Arguments**
-```
- -n,  --edgelist           input network edge-list
- -t,  --threshold          threshold value
- -a,  --algorithm          clustering algorithm (leiden-cpm, leiden-mod, louvain)
- -r,  --resolution         resolution value for leiden-cpm
- -p,  --partitions         number of partitions used in consensus clustering
- -d,  --delta              convergence parameter
- -p,  --maxiter            maximum number of iterations
- -rl, --relabel            relabel network nodes from 0 to #nodes-1
-```
-The script `evaluate_partition.py` can be used to evaluate the output partition in terms of cluster statistics and modularity:
+
+## Useful scripts
+
+### Calculating mixing parameters and clustering statistics
+The script `evaluate_partition.py` can be used to evaluate the output partition in terms of cluster statistics, mixing parameter, and modularity, with the following command:
 ```
 $ python3 evaluate_partition.py -n <edge-list> -m <partition-membership>
 ```
