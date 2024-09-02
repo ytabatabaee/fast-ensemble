@@ -43,6 +43,15 @@ $ python3 fast_ensemble_weighted.py -n <edge-list> -alg <algorithm-list> -falg <
  -o, --output              output community file
  -rl, --relabel            relabel network nodes from 0 to #nodes-1
 ```
+An example algorithm list can be as follows:
+```
+leiden-cpm	0.01	1
+leiden-cpm	0.001	2
+leiden-mod	1	1
+leiden-mod	1	1
+leiden-mod	1	1
+```
+where each line has three elements: name of the clustering algorithm (currently louvain, leiden-mod and leiden-cpm are supported), the resolution parameter for that algorithm, and its weight that specifies its influence over the edge weights in the final clustering.
 
 ## Useful scripts
 
