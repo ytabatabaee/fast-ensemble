@@ -16,17 +16,31 @@ In its simplest form, *FastEnsemble* uses three main parameters: the clustering 
 If you have Python 3 and pip, you can use `pip install -r requirements.txt` to install the other dependencies. 
 
 ## Usage Instructions
-*FastEnsemble* can be run with the following command:
+*FastEnsemble* in its simplest form (using multiple runs of a *single* clustering algorithm), can be run with the following command:
 ```
-$ python3 fast_ensemble.py -n <edge-list> -t <threshold> -a <algorithm> [-r <resolution-value>] -p <number-of-partitions>
+$ python3 fast_ensemble.py -n <edge-list> -t <threshold> -alg <algorithm> [-r <resolution-value>] -p <number-of-partitions>
 ```
 **Arguments**
 ```
  -n,  --edgelist           input network edge-list
- -t,  --threshold          threshold value
- -a,  --algorithm          clustering algorithm (leiden-cpm, leiden-mod, louvain)
+ -t,  --thresh             threshold value
+ -alg,  --algorithm        clustering algorithm (leiden-cpm, leiden-mod, louvain)
  -r,  --resolution         resolution value for leiden-cpm
  -p,  --partitions         number of partitions used in consensus clustering
+ -rl, --relabel            relabel network nodes from 0 to #nodes-1
+```
+A more advanced version, that allows for an arbitary combination of different clustering algorithms with different parameters (e.g. resolution values) and weights can be run with the following command:
+```
+$ python3 fast_ensemble_weighted.py -n <edge-list> -alg <algorithm-list> -falg <final-algorithm> -fr <final-param> -t <threshold>
+```
+**Arguments**
+```
+ -n,  --edgelist           input network edge-list
+ -t,  --thresh             threshold value
+ -alg,  --algorithmlist    list of clustering algorithms, with parameters and weights
+ -falg, --finalalgorithm   clustering algorithm (leiden-cpm, leiden-mod, louvain)
+ -fr, --finalparam         parameter (e.g. resolution value) for the final algorithm    
+ -o, --output              output community file
  -rl, --relabel            relabel network nodes from 0 to #nodes-1
 ```
 
