@@ -1,11 +1,8 @@
 # Fast Ensemble Clustering
 
-This respository includes a python implementation of *FastEnsemble* clustering. 
+**FastEnsemble** is an ensemble clustering method that can be used with one or a combination of clustering paradigms. It is currently implemented for use with Leiden optimizing CPM or modularity and the Louvain algorithm. Each clustering algorithm can potentially be used with different resolution values, enabling multi-resolution ensemble clustering. This implementation also allows the constituent clustering methods to be weighted, so that some clustering methods have more influence than the others on the final output.
 
-
-In its simplest form, *FastEnsemble* uses three main parameters: the clustering method, the number of partitions $np$, and the threshold $t$. Given an input matrix $N$, *FastEnsemble* uses the specified clustering method to generate $n_p$ partitions of $N$, and then builds a new network on the same node and edge set but with the edges weighted by the number of partitions the endpoints are in the same cluster. If a given edge has weight less than $t \times np$ (indicating that its endpoints are co-clustered in fewer than that many partitions), then the edge is removed from the network; hence the new network can have fewer edges than the original network.   The new weighted network is then clustered just once more using the selected clustering method.
-
-*FastEnsemble* can be used with one or a combination of clustering paradigms, and we have implemented it for use with Leiden optimizing CPM, Leiden optimizing modularity, Louvain, and other methods. This implementation also allows the constituent clustering methods to be weighted, so that some clustering methods have more influence than the others.
+In its simplest form, *FastEnsemble* uses three main parameters: the clustering method, the number of partitions $np$, and the threshold $t$. Given an input matrix $N$, *FastEnsemble* uses the specified clustering method to generate $n_p$ partitions of $N$, and then builds a new network on the same node and edge set but with the edges weighted by the number of partitions the endpoints are in the same cluster. If a given edge has weight less than $t \times np$ (indicating that its endpoints are co-clustered in fewer than that many partitions), then the edge is removed from the network. The new weighted network is then clustered just once more using the selected clustering method. 
 
 ## Dependencies
 *FastEnsemble* is implemented in Python 3 and have the following dependencies:
