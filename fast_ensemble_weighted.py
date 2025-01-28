@@ -63,14 +63,14 @@ def get_communities(graph, algorithm, seed, res_val=0.01):
         networkx_node_id_dict = {}
         igraph_node_id_dict = leidenalg.find_partition(relabelled_graph, leidenalg.CPMVertexPartition,
                                                        resolution_parameter=res_val, n_iterations=1, seed=seed).membership
-        print(igraph_node_id_dict)
+        #print(igraph_node_id_dict)
         for igraph_index, vertex in enumerate(relabelled_graph.vs):
             vertex_attributes = vertex.attributes()
             original_id = int(vertex_attributes["_nx_name"])
             relabelled_id = int(igraph_index)
             networkx_node_id_dict[original_id] = igraph_node_id_dict[relabelled_id]
         return networkx_node_id_dict
-    elif algorithm == 'leiden-mod':
+    elif algorithm == 'leiden-mod' or algorithm == 'leiden':
         relabelled_graph = ig.Graph.from_networkx(graph)
         networkx_node_id_dict = {}
         igraph_node_id_dict = leidenalg.find_partition(relabelled_graph, leidenalg.ModularityVertexPartition,
@@ -135,9 +135,6 @@ def simple_consensus(G, algorithm='leiden-mod', n_p=10, thresh=0.9, delta=0.02, 
 
     print('number of iterations:', iter_count)
     final_comm = get_communities(graph, algorithm, 0, res_val=res_value)
-    #print(final_comm)
-    #final_comm = group_to_partition(final_comm)
-    #print(final_comm)
     return final_comm
 
 
@@ -198,11 +195,14 @@ def read_alg_list(list_path):
     alg_list, param_list, weight_list = [], [], []
     with open(list_path) as fgt:
         for line in fgt:
-            alg, param, weight = line.strip().split()
-            alg_list.append(alg)
-            param_list.append(param)
-            weight_list.append(weight)
-    return alg_list, param_list, weight_list
+            try:
+                alg, param, weight = line.strip().split()
+                alg_list.append(alg)
+                param_list.append(float(param))
+                weight_list.append(float(weight))
+            except:
+                continue
+    return alg_list, np.asarray(param_list), np.asarray(weight_list)
 
 
 if __name__ == "__main__":
@@ -233,7 +233,7 @@ if __name__ == "__main__":
 
     alg_list, param_list, weight_list = read_alg_list(args.algorithmlist)
 
-    fe = fast_ensemble(net, alg_list, param_list, weight_list, args.finalalgorithm, args.finalparam, tr=0.8)
+    fe = fast_ensemble(net, alg_list, param_list, weight_list, args.finalalgorithm, args.finalparam, tr=args.threshold)
 
     keys = list(fe.keys())
     keys.sort()
