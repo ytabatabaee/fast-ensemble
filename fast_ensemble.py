@@ -173,7 +173,7 @@ def normal_clustering(graph, algorithm, res_val=0.01):
         return group_to_partition(cl.best_partition(graph))
 
 
-def fast_ensemble(G, algorithm='leiden-cpm', n_p=20, tr=0.2, res_value=0.01):
+def fast_ensemble(G, algorithm='leiden-cpm', n_p=10, tr=0.8, res_value=0.01):
     graph = G.copy()
     graph = initialize(graph, 1)
     partitions = [get_communities(graph, algorithm, i, res_val=res_value) for i in range(n_p)]
@@ -219,12 +219,8 @@ if __name__ == "__main__":
         reverse_mapping = {y: x for x, y in mapping.items()}
 
     n_p = args.partitions
-    #leiden_alg_list = ['leiden-mod'] * n_p
-    #lou_lei_alg_list = ['leiden-mod'] * int(n_p / 2) + ['leiden-cpm'] * (n_p - int(n_p / 2))
-    #sc = simple_consensus(net, algorithm='leiden-mod', n_p=args.partitions, thresh=args.threshold, max_iter=3)
-    #sc = fast_ensemble(net, algorithm='leiden-mod', n_p=args.partitions, tr=args.threshold)
     if args.algorithm == 'leiden-cpm':
-        sc = fast_ensemble(net, algorithm='leiden-mod', n_p=args.partitions, tr=args.threshold, res_value=args.resolution)
+        sc = fast_ensemble(net, algorithm='leiden-cpm', n_p=args.partitions, tr=args.threshold, res_value=args.resolution)
     elif args.algorithm == 'leiden-mod':
         sc = fast_ensemble(net, algorithm='leiden-mod', n_p=args.partitions, tr=args.threshold)
 
@@ -240,8 +236,3 @@ if __name__ == "__main__":
                 writer.writerow([reverse_mapping[i]] + [membership[i]])
             else:
                 writer.writerow([i] + [membership[i]])
-
-
-
-
-
