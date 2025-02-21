@@ -55,15 +55,16 @@ def initialize(graph, value):
     return graph
 
 
-def get_communities(graph, algorithm, seed, res_val=0.01):
+def get_communities(graph, algorithm, seed, res_val=0.01, weighted='weight'):
+    # weighted variable is None or 'weight'
     if algorithm == 'louvain':
-        return cl.best_partition(graph, random_state=seed, weight='weight')
+        return cl.best_partition(graph, random_state=seed, weight=weighted)
     if algorithm == 'leiden-cpm':
         relabelled_graph = ig.Graph.from_networkx(graph)
         networkx_node_id_dict = {}
         igraph_node_id_dict = leidenalg.find_partition(relabelled_graph, leidenalg.CPMVertexPartition,
-                                                       resolution_parameter=res_val, n_iterations=1, seed=seed).membership
-        print(igraph_node_id_dict)
+                                                       resolution_parameter=res_val, weights=weighted,
+                                                       n_iterations=1, seed=seed).membership
         for igraph_index, vertex in enumerate(relabelled_graph.vs):
             vertex_attributes = vertex.attributes()
             original_id = int(vertex_attributes["_nx_name"])
@@ -74,7 +75,7 @@ def get_communities(graph, algorithm, seed, res_val=0.01):
         relabelled_graph = ig.Graph.from_networkx(graph)
         networkx_node_id_dict = {}
         igraph_node_id_dict = leidenalg.find_partition(relabelled_graph, leidenalg.ModularityVertexPartition,
-                                                       weights='weight', n_iterations=-1, seed=seed).membership
+                                                       weights=weighted, n_iterations=-1, seed=seed).membership
         for igraph_index, vertex in enumerate(relabelled_graph.vs):
             vertex_attributes = vertex.attributes()
             original_id = int(vertex_attributes["_nx_name"])
@@ -208,6 +209,8 @@ if __name__ == "__main__":
                         help="Number of partitions in consensus clustering", default=10)
     parser.add_argument("-rl", "--relabel", required=False, action='store_true',
                         help="Relabel network nodes from 0 to #nodes-1.", default=False)
+    parser.add_argument("-nw", "--noweight", required=False, action='store_true',
+                        help="Specify that clustering methods should NOT take the edge weights into account", default=False)
 
     args = parser.parse_args()
     net = nx.read_edgelist(args.edgelist, nodetype=int)
@@ -219,14 +222,11 @@ if __name__ == "__main__":
         reverse_mapping = {y: x for x, y in mapping.items()}
 
     n_p = args.partitions
-    if args.algorithm == 'leiden-cpm':
-        sc = fast_ensemble(net, algorithm='leiden-cpm', n_p=args.partitions, tr=args.threshold, res_value=args.resolution)
-    elif args.algorithm == 'leiden-mod':
-        sc = fast_ensemble(net, algorithm='leiden-mod', n_p=args.partitions, tr=args.threshold)
+    fe = fast_ensemble(net, args.algorithm, n_p=args.partitions, tr=args.threshold, res_value=args.resolution)
 
-    keys = list(sc.keys())
+    keys = list(fe.keys())
     keys.sort()
-    membership_dict = {i: sc[i] for i in keys}
+    membership_dict = {i: fe[i] for i in keys}
     membership = list(membership_dict.values())
 
     with open(args.output, 'w') as out_file:

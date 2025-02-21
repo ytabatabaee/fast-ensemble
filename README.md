@@ -29,6 +29,7 @@ $ python3 fast_ensemble.py -n <edge-list> -t <threshold> -alg <algorithm> [-r <r
  -r,  --resolution         resolution value for leiden-cpm
  -p,  --partitions         number of partitions used in consensus clustering
  -rl, --relabel            relabel network nodes from 0 to #nodes-1
+ -nw, --noweight           ignore edge weights when clustering
 ```
 A more advanced version, that allows for an arbitrary combination of different clustering algorithms with different parameters (e.g. resolution values) and weights can be run with the following command:
 ```
