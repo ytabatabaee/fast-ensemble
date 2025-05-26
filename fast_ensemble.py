@@ -174,7 +174,7 @@ def normal_clustering(graph, algorithm, res_val=0.01):
         return group_to_partition(cl.best_partition(graph))
 
 
-def fast_ensemble(G, algorithm='leiden-cpm', n_p=10, tr=0.8, res_value=0.01):
+def fast_ensemble(G, algorithm='leiden-cpm', n_p=10, tr=0.8, res_value=0.01, final_alg='leiden-cpm', final_param=0.01):
     graph = G.copy()
     graph = initialize(graph, 1)
     partitions = [get_communities(graph, algorithm, i, res_val=res_value) for i in range(n_p)]
@@ -189,22 +189,25 @@ def fast_ensemble(G, algorithm='leiden-cpm', n_p=10, tr=0.8, res_value=0.01):
                 break
     graph.remove_edges_from(remove_edges)
 
-    #return group_to_partition(get_communities(graph, algorithm, 0, res_val=res_value))
-    return get_communities(graph, algorithm, 0, res_val=res_value)
+    return get_communities(graph, final_alg, 0, res_val=final_param)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Fast Ensemble Clustering")
+    parser = argparse.ArgumentParser(description="FastEnsemble Clustering")
     parser.add_argument("-n", "--edgelist", type=str,  required=True,
                         help="Network edge-list file")
     parser.add_argument("-alg", "--algorithm", type=str, required=False,
-                        help="Clustering algorithm (leiden-mod or leiden-cpm)", default='leiden-cpm')
+                        help="Clustering algorithm (leiden-mod, leiden-cpm or louvain)", default='leiden-cpm')
     parser.add_argument("-o", "--output", type=str, required=True,
                         help="Output community file")
     parser.add_argument("-t", "--threshold", type=float, required=False,
                         help="Threshold value", default=0.8)
     parser.add_argument("-r", "--resolution", type=float, required=False,
                         help="Resolution value for leiden-cpm", default=0.01)
+    parser.add_argument("-falg", "--finalalgorithm", type=str, required=False,
+                        help="", default=None)
+    parser.add_argument("-fr", "--finalparam", type=float, required=False,
+                        help="Parameter (e.g. resolution value) for the final algorithm", default=None)
     parser.add_argument("-p", "--partitions", type=int, required=False,
                         help="Number of partitions in consensus clustering", default=10)
     parser.add_argument("-rl", "--relabel", required=False, action='store_true',
@@ -222,7 +225,13 @@ if __name__ == "__main__":
         reverse_mapping = {y: x for x, y in mapping.items()}
 
     n_p = args.partitions
-    fe = fast_ensemble(net, args.algorithm, n_p=args.partitions, tr=args.threshold, res_value=args.resolution)
+    if not args.finalalgorithm:
+        args.finalalgorithm = args.algorithm
+    if not args.finalparam:
+        args.finalparam = args.resolution
+
+    fe = fast_ensemble(net, args.algorithm, n_p=args.partitions, tr=args.threshold, res_value=args.resolution,
+                       final_alg=args.finalalgorithm, final_param=args.finalparam)
 
     keys = list(fe.keys())
     keys.sort()
