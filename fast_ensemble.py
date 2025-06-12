@@ -174,10 +174,10 @@ def normal_clustering(graph, algorithm, res_val=0.01):
         return group_to_partition(cl.best_partition(graph))
 
 
-def fast_ensemble(G, algorithm='leiden-cpm', n_p=10, tr=0.8, res_value=0.01, final_alg='leiden-cpm', final_param=0.01):
+def fast_ensemble(G, algorithm='leiden-cpm', n_p=10, tr=0.8, res_value=0.01, final_alg='leiden-cpm', final_param=0.01, weighted='weight'):
     graph = G.copy()
     graph = initialize(graph, 1)
-    partitions = [get_communities(graph, algorithm, i, res_val=res_value) for i in range(n_p)]
+    partitions = [get_communities(graph, algorithm, i, res_val=res_value, weighted=weighted) for i in range(n_p)]
 
     remove_edges = []
     for node, nbr in graph.edges():
@@ -189,7 +189,7 @@ def fast_ensemble(G, algorithm='leiden-cpm', n_p=10, tr=0.8, res_value=0.01, fin
                 break
     graph.remove_edges_from(remove_edges)
 
-    return get_communities(graph, final_alg, 0, res_val=final_param)
+    return get_communities(graph, final_alg, 0, res_val=final_param, weighted=weighted)
 
 
 if __name__ == "__main__":
@@ -231,7 +231,7 @@ if __name__ == "__main__":
         args.finalparam = args.resolution
 
     fe = fast_ensemble(net, args.algorithm, n_p=args.partitions, tr=args.threshold, res_value=args.resolution,
-                       final_alg=args.finalalgorithm, final_param=args.finalparam)
+                       final_alg=args.finalalgorithm, final_param=args.finalparam, weighted=None if args.noweight else 'weight')
 
     keys = list(fe.keys())
     keys.sort()
