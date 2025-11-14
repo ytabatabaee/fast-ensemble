@@ -4,7 +4,7 @@
 
 The FastEnsemble algorithm is described in the following paper:
 
-Y. Tabatabaee, E. Wedell, M. Park, T. Warnow. FastEnsemble: A new scalable ensemble clustering method. International Conference on Complex Networks and their Applications (CNA) 2024. Preprint available at https://arxiv.org/abs/2409.02077.
+Y. Tabatabaee, E. Wedell, M. Park, T. Warnow (2025). *FastEnsemble: Scalable ensemble clustering on large networks*. PLOS Complex Systems 2(10): e0000069 [preliminary version appeared at International Conference on Complex Networks and their Applications (CNA) 2024] DOI: [10.1371/journal.pcsy.0000069](https://journals.plos.org/complexsystems/article?id=10.1371/journal.pcsy.0000069)
 
 Datasets and scripts from this study are available at [ensemble-clustering-data](https://github.com/ytabatabaee/ensemble-clustering-data) repository.
 
