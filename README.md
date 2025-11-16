@@ -4,7 +4,7 @@
 
 The FastEnsemble algorithm is described in the following paper:
 
-Y. Tabatabaee, E. Wedell, M. Park, T. Warnow. FastEnsemble: A new scalable ensemble clustering method. International Conference on Complex Networks and their Applications (CNA) 2024. Preprint available at https://arxiv.org/abs/2409.02077.
+Y. Tabatabaee, E. Wedell, M. Park, T. Warnow (2025). *FastEnsemble: Scalable ensemble clustering on large networks*. PLOS Complex Systems 2(10): e0000069 [preliminary version appeared at International Conference on Complex Networks and their Applications (CNA) 2024] DOI: [10.1371/journal.pcsy.0000069](https://journals.plos.org/complexsystems/article?id=10.1371/journal.pcsy.0000069)
 
 Datasets and scripts from this study are available at [ensemble-clustering-data](https://github.com/ytabatabaee/ensemble-clustering-data) repository.
 
@@ -19,7 +19,7 @@ If you have Python 3 and pip, you can use `pip install -r requirements.txt` to i
 ## Usage Instructions
 In its simplest form, FastEnsemble combines multiple runs of a *single* clustering algorithm, and can be run with the following command:
 ```
-$ python3 fast_ensemble.py -n <edge-list> -t <threshold> -alg <algorithm> [-r <resolution-value>] -p <number-of-partitions>
+$ python3 fast_ensemble.py -n <edge-list> -t <threshold> -alg <algorithm> [-r <resolution-value>] [-p <number-of-partitions>] [-falg <final-algorithm>] [-fr <final-param>]
 ```
 **Arguments**
 ```
@@ -27,6 +27,8 @@ $ python3 fast_ensemble.py -n <edge-list> -t <threshold> -alg <algorithm> [-r <r
  -t,  --thresh             threshold value
  -alg,  --algorithm        clustering algorithm (leiden-cpm, leiden-mod, louvain)
  -r,  --resolution         resolution value for leiden-cpm
+ -falg, --finalalgorithm   clustering algorithm for the final step (leiden-cpm, leiden-mod, louvain) - same as -alg if not specified
+ -fr, --finalparam         parameter (e.g. resolution value) for the final algorithm - same as -r if not specified
  -p,  --partitions         number of partitions used in consensus clustering
  -rl, --relabel            relabel network nodes from 0 to #nodes-1
  -nw, --noweight           ignore edge weights when clustering
@@ -40,7 +42,7 @@ $ python3 fast_ensemble_weighted.py -n <edge-list> -alg <algorithm-list> -falg <
  -n,  --edgelist           input network edge-list
  -t,  --thresh             threshold value
  -alg,  --algorithmlist    list of clustering algorithms, with parameters and weights
- -falg, --finalalgorithm   clustering algorithm (leiden-cpm, leiden-mod, louvain)
+ -falg, --finalalgorithm   clustering algorithm for the final step (leiden-cpm, leiden-mod, louvain)
  -fr, --finalparam         parameter (e.g. resolution value) for the final algorithm    
  -o, --output              output community file
  -rl, --relabel            relabel network nodes from 0 to #nodes-1
