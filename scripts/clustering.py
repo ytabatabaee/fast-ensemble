@@ -63,14 +63,14 @@ def get_communities(graph, algorithm, seed, res_val=0.01):
         networkx_node_id_dict = {}
         igraph_node_id_dict = leidenalg.find_partition(relabelled_graph, leidenalg.CPMVertexPartition,
                                                        resolution_parameter=res_val, n_iterations=1, seed=seed).membership
-        #print(igraph_node_id_dict)
+        print(igraph_node_id_dict)
         for igraph_index, vertex in enumerate(relabelled_graph.vs):
             vertex_attributes = vertex.attributes()
             original_id = int(vertex_attributes["_nx_name"])
             relabelled_id = int(igraph_index)
             networkx_node_id_dict[original_id] = igraph_node_id_dict[relabelled_id]
         return networkx_node_id_dict
-    elif algorithm == 'leiden-mod' or algorithm == 'leiden':
+    elif algorithm == 'leiden-mod':
         relabelled_graph = ig.Graph.from_networkx(graph)
         networkx_node_id_dict = {}
         igraph_node_id_dict = leidenalg.find_partition(relabelled_graph, leidenalg.ModularityVertexPartition,
@@ -135,26 +135,10 @@ def simple_consensus(G, algorithm='leiden-mod', n_p=10, thresh=0.9, delta=0.02, 
 
     print('number of iterations:', iter_count)
     final_comm = get_communities(graph, algorithm, 0, res_val=res_value)
+    #print(final_comm)
+    #final_comm = group_to_partition(final_comm)
+    #print(final_comm)
     return final_comm
-
-
-def strict_consensus(G, algorithm='leiden-cpm', n_p=20, res_val=0.01):
-    graph = G.copy()
-    graph = initialize(graph, 1.0)
-    iter_count = 0
-
-    partitions = [get_communities(graph, algorithm, i, res_val) for i in range(n_p)]
-
-    for i in range(n_p):
-        c = partitions[i]
-        for node, nbr in graph.edges():
-            if c[node] != c[nbr]:
-                graph[node][nbr]['weight'] = 0
-
-    graph = thresholding(graph, 1, 1)
-
-    return get_communities(graph, algorithm, 0, res_val) # group_to_partition(
-
 
 def normal_clustering(graph, algorithm, res_val=0.01):
     if algorithm == 'leiden-cpm':
@@ -170,55 +154,35 @@ def normal_clustering(graph, algorithm, res_val=0.01):
         return group_to_partition(cl.best_partition(graph))
 
 
-def fast_ensemble(G, alg_list, param_list, weight_list, final_alg, final_param, tr=0.8):
+def fast_ensemble(G, algorithm='leiden-cpm', n_p=20, tr=0.2, res_value=0.01):
     graph = G.copy()
-    graph = initialize(graph, 1.0)
-    n_p = len(alg_list)
-    partitions = [get_communities(graph, alg_list[i], i, param_list[i]) for i in range(len(alg_list))]
-    sum_weights = sum(weight_list)
-    normalized_weights = weight_list / sum_weights
+    graph = initialize(graph, 1)
+    partitions = [get_communities(graph, algorithm, i, res_val=res_value) for i in range(n_p)]
 
     remove_edges = []
     for node, nbr in graph.edges():
         for i in range(n_p):
             if partitions[i][node] != partitions[i][nbr]:
-                graph[node][nbr]['weight'] -= normalized_weights[i]
+                graph[node][nbr]['weight'] -= 1/n_p
             if graph[node][nbr]['weight'] < tr:
                 remove_edges.append((node, nbr))
                 break
     graph.remove_edges_from(remove_edges)
 
-    return get_communities(graph, final_alg, 0, res_val=final_param)
-
-
-def read_alg_list(list_path):
-    alg_list, param_list, weight_list = [], [], []
-    with open(list_path) as fgt:
-        for line in fgt:
-            try:
-                alg, param, weight = line.strip().split()
-                alg_list.append(alg)
-                param_list.append(float(param))
-                weight_list.append(float(weight))
-            except:
-                continue
-    return alg_list, np.asarray(param_list), np.asarray(weight_list)
+    #return group_to_partition(get_communities(graph, algorithm, 0, res_val=res_value))
+    return get_communities(graph, algorithm, 0, res_val=res_value)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Fast Ensemble Clustering")
+    parser = argparse.ArgumentParser(description="Normal clustering")
     parser.add_argument("-n", "--edgelist", type=str,  required=True,
                         help="Network edge-list file")
-    parser.add_argument("-alg", "--algorithmlist", type=str, required=True,
-                        help="A list of clustering algorithms, with parameters and weights")
-    parser.add_argument("-falg", "--finalalgorithm", type=str, required=False,
-                        help="", default='leiden-cpm')
-    parser.add_argument("-fr", "--finalparam", type=float, required=False,
-                        help="Parameter (e.g. resolution value) for the final algorithm", default=0.01)
+    parser.add_argument("-alg", "--algorithm", type=str, required=False,
+                        help="Clustering algorithm (louvain, leiden-mod or leiden-cpm)", default='leiden-cpm')
+    parser.add_argument("-r", "--resolution", type=float, required=False,
+                        help="Resolution value for leiden-cpm", default=0.01)
     parser.add_argument("-o", "--output", type=str, required=True,
                         help="Output community file")
-    parser.add_argument("-t", "--threshold", type=float, required=False,
-                        help="Threshold value", default=0.8)
     parser.add_argument("-rl", "--relabel", required=False, action='store_true',
                         help="Relabel network nodes from 0 to #nodes-1.", default=False)
 
@@ -231,13 +195,10 @@ if __name__ == "__main__":
         net = nx.relabel_nodes(net, mapping)
         reverse_mapping = {y: x for x, y in mapping.items()}
 
-    alg_list, param_list, weight_list = read_alg_list(args.algorithmlist)
-
-    fe = fast_ensemble(net, alg_list, param_list, weight_list, args.finalalgorithm, args.finalparam, tr=args.threshold)
-
-    keys = list(fe.keys())
+    sc = get_communities(net, args.algorithm, 0, res_val=args.resolution)
+    keys = list(sc.keys())
     keys.sort()
-    membership_dict = {i: fe[i] for i in keys}
+    membership_dict = {i: sc[i] for i in keys}
     membership = list(membership_dict.values())
 
     with open(args.output, 'w') as out_file:
@@ -247,8 +208,3 @@ if __name__ == "__main__":
                 writer.writerow([reverse_mapping[i]] + [membership[i]])
             else:
                 writer.writerow([i] + [membership[i]])
-
-
-
-
-
