@@ -2,15 +2,7 @@ import leidenalg
 import networkx as nx
 import igraph as ig
 import community.community_louvain as cl
-import numpy as np
-import pandas as pd
 import argparse
-import seaborn as sns
-from networkx.algorithms.community import modularity
-from sklearn.metrics.cluster import adjusted_mutual_info_score
-from sklearn.metrics.cluster import adjusted_rand_score
-from sklearn.metrics.cluster import normalized_mutual_info_score
-import matplotlib.pyplot as plt
 import csv
 
 
@@ -22,31 +14,6 @@ def group_to_partition(partition):
         else:
             part_dict[value] = [index]
     return part_dict.values()
-
-
-def membership_list_to_dict(membership_list):
-    membership_dict = {}
-    for i in range(len(membership_list)):
-        membership_dict[i] = membership_list[i]
-    return membership_dict
-
-
-def get_membership_list_from_dict(membership_dict, n):
-    memberships = [0]*n
-    for i in range(len(membership_dict)):
-        for x in membership_dict[i]:
-            memberships[x] = i
-    return memberships
-
-
-def communities_to_dict(communities):
-    result = {}
-    community_index = 0
-    for c in communities:
-        community_mapping = ({node: community_index for index, node in enumerate(c)})
-        result = {**result, **community_mapping}
-        community_index += 1
-    return result
 
 
 def initialize(graph, value):
