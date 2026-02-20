@@ -6,10 +6,12 @@ from concurrent.futures import ProcessPoolExecutor
 import argparse
 import csv
 
+
 def _partition_worker(args):
     graph, algorithm, seed, res_value, weighted = args
     ig_graph = None if algorithm == 'louvain' else ig.Graph.from_networkx(graph)
     return get_communities(graph, algorithm, seed, res_val=res_value, weighted=weighted, ig_graph=ig_graph)
+
 
 def group_to_partition(partition):
     part_dict = {}
@@ -80,45 +82,6 @@ def thresholding(graph, n_p, thresh):
     return graph
 
 
-def simple_consensus(G, algorithm='leiden-mod', n_p=10, thresh=0.9, delta=0.02, max_iter=10, res_value=0.01):
-    graph = G.copy()
-    graph = initialize(graph, 1.0)
-    iter_count = 0
-
-    while True:
-        iter_count += 1
-        if iter_count > max_iter:
-            iter_count -= 1
-            break
-        nextgraph = graph.copy()
-        nextgraph = initialize(nextgraph, 0.0)
-        partitions = [get_communities(graph, algorithm, i, res_val=res_value) for i in range(n_p)]
-
-        # print('edges', len(graph.edges()))
-        for i in range(n_p):
-            # print('np: ', i)
-            c = partitions[i]
-            for node, nbr in graph.edges():
-                if graph[node][nbr]['weight'] not in (0, n_p):
-                    if c[node] == c[nbr]:
-                        nextgraph[node][nbr]['weight'] += 1
-                else:
-                    nextgraph[node][nbr]['weight'] = graph[node][nbr]['weight']
-                # print(node, nbr, nextgraph[node][nbr]['weight'])
-
-        nextgraph = thresholding(nextgraph, n_p, thresh)
-        if check_convergence(nextgraph, n_p, delta=delta):
-            break
-        graph = nextgraph.copy()
-
-    print('number of iterations:', iter_count)
-    final_comm = get_communities(graph, algorithm, 0, res_val=res_value)
-    #print(final_comm)
-    #final_comm = group_to_partition(final_comm)
-    #print(final_comm)
-    return final_comm
-
-
 def strict_consensus(G, algorithm='leiden-cpm', n_p=20, res_val=0.01):
     graph = G.copy()
     graph = initialize(graph, 1.0)
@@ -134,7 +97,7 @@ def strict_consensus(G, algorithm='leiden-cpm', n_p=20, res_val=0.01):
 
     graph = thresholding(graph, 1, 1)
 
-    return get_communities(graph, algorithm, 0, res_val) # group_to_partition(
+    return get_communities(graph, algorithm, 0, res_val)
 
 
 def normal_clustering(graph, algorithm, res_val=0.01):
@@ -154,9 +117,13 @@ def normal_clustering(graph, algorithm, res_val=0.01):
 def fast_ensemble(G, algorithm='leiden-cpm', n_p=10, tr=0.8, res_value=0.01,
                   final_alg='leiden-cpm', final_param=0.01,
                   weighted='weight', use_parallel=False):
+
     graph = G.copy()
     graph = initialize(graph, 1)
 
+    edges = list(graph.edges())
+
+    # ---- Generate partitions ----
     if use_parallel:
         with ProcessPoolExecutor() as executor:
             partitions = list(executor.map(
@@ -175,27 +142,30 @@ def fast_ensemble(G, algorithm='leiden-cpm', n_p=10, tr=0.8, res_value=0.01,
 
     remove_edges = []
 
-    for node, nbr in graph.edges():
-        weight = 1.0
+    # ---- Precompute disagreements ----
+    for u, v in edges:
+        disagree = 0
+
         for part in partitions:
-            if part[node] != part[nbr]:
-                weight -= 1 / n_p
-                if weight < tr:
-                    remove_edges.append((node, nbr))
-                    break
-        else:
-            graph[node][nbr]['weight'] = weight
-            continue
-        # only executed if break happens
-        graph[node][nbr]['weight'] = weight
+            if part[u] != part[v]:
+                disagree += 1
+
+        weight = 1.0 - (disagree / n_p)
+
+        if weight < tr:
+            remove_edges.append((u, v))
+
+        graph[u][v]['weight'] = weight
 
     graph.remove_edges_from(remove_edges)
 
     final_ig = None if final_alg == 'louvain' else ig.Graph.from_networkx(graph)
+
     return get_communities(graph, final_alg, 0,
                            res_val=final_param,
                            weighted=weighted,
                            ig_graph=final_ig)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="FastEnsemble Clustering")
