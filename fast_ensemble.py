@@ -3,15 +3,15 @@ import networkx as nx
 import igraph as ig
 import community.community_louvain as cl
 import numpy as np
-import pandas as pd
+from concurrent.futures import ProcessPoolExecutor
 import argparse
-import seaborn as sns
-from networkx.algorithms.community import modularity
-from sklearn.metrics.cluster import adjusted_mutual_info_score
-from sklearn.metrics.cluster import adjusted_rand_score
-from sklearn.metrics.cluster import normalized_mutual_info_score
-import matplotlib.pyplot as plt
 import csv
+
+
+def _partition_worker(args):
+    graph, algorithm, seed, res_value, weighted = args
+    ig_graph = None if algorithm == 'louvain' else ig.Graph.from_networkx(graph)
+    return get_communities(graph, algorithm, seed, res_val=res_value, weighted=weighted, ig_graph=ig_graph)
 
 
 def group_to_partition(partition):
@@ -24,64 +24,44 @@ def group_to_partition(partition):
     return part_dict.values()
 
 
-def membership_list_to_dict(membership_list):
-    membership_dict = {}
-    for i in range(len(membership_list)):
-        membership_dict[i] = membership_list[i]
-    return membership_dict
-
-
-def get_membership_list_from_dict(membership_dict, n):
-    memberships = [0]*n
-    for i in range(len(membership_dict)):
-        for x in membership_dict[i]:
-            memberships[x] = i
-    return memberships
-
-
-def communities_to_dict(communities):
-    result = {}
-    community_index = 0
-    for c in communities:
-        community_mapping = ({node: community_index for index, node in enumerate(c)})
-        result = {**result, **community_mapping}
-        community_index += 1
-    return result
-
-
 def initialize(graph, value):
     for u, v in graph.edges():
         graph[u][v]['weight'] = value
     return graph
 
 
-def get_communities(graph, algorithm, seed, res_val=0.01, weighted='weight'):
-    # weighted variable is None or 'weight'
+def get_communities(graph, algorithm, seed, res_val=0.01, weighted='weight', ig_graph=None):
     if algorithm == 'louvain':
         return cl.best_partition(graph, random_state=seed, weight=weighted)
+
+    if ig_graph is None:
+        ig_graph = ig.Graph.from_networkx(graph)
+
     if algorithm == 'leiden-cpm':
-        relabelled_graph = ig.Graph.from_networkx(graph)
-        networkx_node_id_dict = {}
-        igraph_node_id_dict = leidenalg.find_partition(relabelled_graph, leidenalg.CPMVertexPartition,
-                                                       resolution_parameter=res_val, weights=weighted,
-                                                       n_iterations=1, seed=seed).membership
-        for igraph_index, vertex in enumerate(relabelled_graph.vs):
-            vertex_attributes = vertex.attributes()
-            original_id = int(vertex_attributes["_nx_name"])
-            relabelled_id = int(igraph_index)
-            networkx_node_id_dict[original_id] = igraph_node_id_dict[relabelled_id]
-        return networkx_node_id_dict
+        membership = leidenalg.find_partition(
+            ig_graph,
+            leidenalg.CPMVertexPartition,
+            resolution_parameter=res_val,
+            weights=weighted,
+            n_iterations=1,
+            seed=seed
+        ).membership
+
     elif algorithm == 'leiden-mod':
-        relabelled_graph = ig.Graph.from_networkx(graph)
-        networkx_node_id_dict = {}
-        igraph_node_id_dict = leidenalg.find_partition(relabelled_graph, leidenalg.ModularityVertexPartition,
-                                                       weights=weighted, n_iterations=-1, seed=seed).membership
-        for igraph_index, vertex in enumerate(relabelled_graph.vs):
-            vertex_attributes = vertex.attributes()
-            original_id = int(vertex_attributes["_nx_name"])
-            relabelled_id = int(igraph_index)
-            networkx_node_id_dict[original_id] = igraph_node_id_dict[relabelled_id]
-        return networkx_node_id_dict
+        membership = leidenalg.find_partition(
+            ig_graph,
+            leidenalg.ModularityVertexPartition,
+            weights=weighted,
+            n_iterations=-1,
+            seed=seed
+        ).membership
+
+    networkx_node_id_dict = {}
+    for igraph_index, vertex in enumerate(ig_graph.vs):
+        original_id = int(vertex["_nx_name"])
+        networkx_node_id_dict[original_id] = membership[igraph_index]
+
+    return networkx_node_id_dict
 
 
 def check_convergence(G, n_p, delta):
@@ -103,45 +83,6 @@ def thresholding(graph, n_p, thresh):
     return graph
 
 
-def simple_consensus(G, algorithm='leiden-mod', n_p=10, thresh=0.9, delta=0.02, max_iter=10, res_value=0.01):
-    graph = G.copy()
-    graph = initialize(graph, 1.0)
-    iter_count = 0
-
-    while True:
-        iter_count += 1
-        if iter_count > max_iter:
-            iter_count -= 1
-            break
-        nextgraph = graph.copy()
-        nextgraph = initialize(nextgraph, 0.0)
-        partitions = [get_communities(graph, algorithm, i, res_val=res_value) for i in range(n_p)]
-
-        # print('edges', len(graph.edges()))
-        for i in range(n_p):
-            # print('np: ', i)
-            c = partitions[i]
-            for node, nbr in graph.edges():
-                if graph[node][nbr]['weight'] not in (0, n_p):
-                    if c[node] == c[nbr]:
-                        nextgraph[node][nbr]['weight'] += 1
-                else:
-                    nextgraph[node][nbr]['weight'] = graph[node][nbr]['weight']
-                # print(node, nbr, nextgraph[node][nbr]['weight'])
-
-        nextgraph = thresholding(nextgraph, n_p, thresh)
-        if check_convergence(nextgraph, n_p, delta=delta):
-            break
-        graph = nextgraph.copy()
-
-    print('number of iterations:', iter_count)
-    final_comm = get_communities(graph, algorithm, 0, res_val=res_value)
-    #print(final_comm)
-    #final_comm = group_to_partition(final_comm)
-    #print(final_comm)
-    return final_comm
-
-
 def strict_consensus(G, algorithm='leiden-cpm', n_p=20, res_val=0.01):
     graph = G.copy()
     graph = initialize(graph, 1.0)
@@ -157,7 +98,7 @@ def strict_consensus(G, algorithm='leiden-cpm', n_p=20, res_val=0.01):
 
     graph = thresholding(graph, 1, 1)
 
-    return get_communities(graph, algorithm, 0, res_val) # group_to_partition(
+    return get_communities(graph, algorithm, 0, res_val)
 
 
 def normal_clustering(graph, algorithm, res_val=0.01):
@@ -174,22 +115,108 @@ def normal_clustering(graph, algorithm, res_val=0.01):
         return group_to_partition(cl.best_partition(graph))
 
 
-def fast_ensemble(G, algorithm='leiden-cpm', n_p=10, tr=0.8, res_value=0.01, final_alg='leiden-cpm', final_param=0.01, weighted='weight'):
+def build_partition_specs(algorithm=None, res_value=None, n_p=None,
+                          alg_list=None, param_list=None, weight_list=None):
+
+    if alg_list is not None:
+        # weighted heterogeneous mode
+        total = weight_list.sum()
+        if total == 0:
+            raise ValueError("Weights must sum to > 0")
+        weight_list = weight_list / total
+        return [(alg_list[i], param_list[i], weight_list[i])
+                for i in range(len(alg_list))]
+
+    # homogeneous mode
+    alpha = 1.0 / n_p
+    return [(algorithm, res_value, alpha) for _ in range(n_p)]
+
+
+def _partition_worker_spec(args):
+    graph, alg, res, seed, weighted = args
+    ig_graph = None if alg == 'louvain' else ig.Graph.from_networkx(graph)
+    return get_communities(graph, alg, seed, res_val=res,
+                           weighted=weighted,
+                           ig_graph=ig_graph)
+
+
+def fast_ensemble(G, partition_specs=None, algorithm=None,
+                  res_value=0.01, n_p=10, tr=0.8, final_alg='leiden-cpm', final_param=0.01,
+                  weighted='weight', use_parallel=False):
     graph = G.copy()
-    graph = initialize(graph, 1)
-    partitions = [get_communities(graph, algorithm, i, res_val=res_value, weighted=weighted) for i in range(n_p)]
+    graph = initialize(graph, 1.0)
+
+    if partition_specs is None:
+        partition_specs = build_partition_specs(
+            algorithm=algorithm,
+            res_value=res_value,
+            n_p=n_p
+        )
+
+    # ---- Generate partitions ----
+    if use_parallel:
+        with ProcessPoolExecutor() as executor:
+            partitions = list(executor.map(
+                _partition_worker_spec,
+                [(graph, alg, res, i, weighted)
+                 for i, (alg, res, _) in enumerate(partition_specs)]
+            ))
+    else:
+        ig_cache = {}
+        partitions = []
+        for i, (alg, res, _) in enumerate(partition_specs):
+            if alg != 'louvain':
+                if alg not in ig_cache:
+                    ig_cache[alg] = ig.Graph.from_networkx(graph)
+                ig_graph = ig_cache[alg]
+            else:
+                ig_graph = None
+
+            partitions.append(
+                get_communities(graph, alg, i,
+                                res_val=res,
+                                weighted=weighted,
+                                ig_graph=ig_graph)
+            )
 
     remove_edges = []
-    for node, nbr in graph.edges():
-        for i in range(n_p):
-            if partitions[i][node] != partitions[i][nbr]:
-                graph[node][nbr]['weight'] -= 1/n_p
-            if graph[node][nbr]['weight'] < tr:
-                remove_edges.append((node, nbr))
-                break
+
+    for u, v in graph.edges():
+        weight = 1.0
+
+        for part, (_, _, alpha) in zip(partitions, partition_specs):
+            if part[u] != part[v]:
+                weight -= alpha
+                if weight < tr:
+                    remove_edges.append((u, v))
+                    break
+
+        graph[u][v]['weight'] = weight
+
     graph.remove_edges_from(remove_edges)
 
-    return get_communities(graph, final_alg, 0, res_val=final_param, weighted=weighted)
+    final_ig = None if final_alg == 'louvain' else ig.Graph.from_networkx(graph)
+
+    return get_communities(graph,
+                           final_alg,
+                           0,
+                           res_val=final_param,
+                           weighted=weighted,
+                           ig_graph=final_ig)
+
+
+def read_alg_list(list_path):
+    alg_list, param_list, weight_list = [], [], []
+    with open(list_path) as fgt:
+        for line in fgt:
+            try:
+                alg, param, weight = line.strip().split()
+                alg_list.append(alg)
+                param_list.append(float(param))
+                weight_list.append(float(weight))
+            except:
+                continue
+    return alg_list, np.asarray(param_list), np.asarray(weight_list)
 
 
 if __name__ == "__main__":
@@ -212,8 +239,14 @@ if __name__ == "__main__":
                         help="Number of partitions in consensus clustering", default=10)
     parser.add_argument("-rl", "--relabel", required=False, action='store_true',
                         help="Relabel network nodes from 0 to #nodes-1.", default=False)
+    parser.add_argument("-alglist", "--algorithmlist", type=str, required=False,
+                        help="A list of clustering algorithms, with parameters and weights")
     parser.add_argument("-nw", "--noweight", required=False, action='store_true',
                         help="Specify that clustering methods should NOT take the edge weights into account", default=False)
+    parser.add_argument("-mp", "--multiprocessing",
+                        required=False, action='store_true',
+                        help="Enable multiprocessing for partition generation",
+                        default=False)
 
     args = parser.parse_args()
     net = nx.read_edgelist(args.edgelist, nodetype=int)
@@ -230,8 +263,29 @@ if __name__ == "__main__":
     if not args.finalparam:
         args.finalparam = args.resolution
 
-    fe = fast_ensemble(net, args.algorithm, n_p=args.partitions, tr=args.threshold, res_value=args.resolution,
-                       final_alg=args.finalalgorithm, final_param=args.finalparam, weighted=None if args.noweight else 'weight')
+    if args.algorithmlist:
+        alg_list, param_list, weight_list = read_alg_list(args.algorithmlist)
+        partition_specs = build_partition_specs(
+            alg_list=alg_list,
+            param_list=param_list,
+            weight_list=weight_list
+        )
+    else:
+        partition_specs = None
+
+    if partition_specs is not None:
+        algorithm = None
+
+    fe = fast_ensemble(net,
+                       partition_specs=partition_specs,
+                       algorithm=args.algorithm,
+                       res_value=args.resolution,
+                       n_p=args.partitions,
+                       tr=args.threshold,
+                       final_alg=args.finalalgorithm,
+                       final_param=args.finalparam,
+                       weighted=None if args.noweight else 'weight',
+                       use_parallel=args.multiprocessing)
 
     keys = list(fe.keys())
     keys.sort()
