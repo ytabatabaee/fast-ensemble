@@ -66,7 +66,7 @@ where:
 
 ## Example
 
-We demonstrate the use of FastEnsemble on the [Youtube social network](https://snap.stanford.edu/data/com-Youtube.html) from the [SNAP collection](https://snap.stanford.edu/index.html). The [/data](https://github.com/ytabatabaee/fast-ensemble/tree/main/data) directory includes example inputs and outputs.
+We demonstrate the use of FastEnsemble on the [Youtube social network](https://snap.stanford.edu/data/com-Youtube.html) and the [Amazon product co-purchasing network](https://snap.stanford.edu/data/com-Amazon.html) from the [SNAP collection](https://snap.stanford.edu/index.html). The [/data](https://github.com/ytabatabaee/fast-ensemble/tree/main/data) directory includes example inputs and outputs.
 
 #### Homogeneous Ensemble
 
@@ -78,9 +78,9 @@ $ python3 fast_ensemble.py -n data/youtube-network.dat -t 0.8 -alg leiden-cpm --
 
 FastEnsemble also supports combining different algorithms and resolution values in a single ensemble through an algorithm list:
 ```
-$ python3 fast_ensemble.py -n data/youtube-network.dat -alglist data/inputs/ensemble_mod_0.01.txt -o data/fe_weighted_youtube_new_cpm.dat
+$ python3 fast_ensemble.py -n data/amazon-network.dat -alglist data/inputs/ensemble_mod_0.01.txt -o data/fe_weighted_amazon.dat
 ```
-In this example, the file `ensemble_mod_0.01.txt` specifies a mixture of Leiden-Modularity and Leiden-CPM runs with associated parameters and weights.
+In this example, the file `ensemble_mod_0.01.txt` specifies a mixture of Leiden-modularity and Leiden-CPM runs with associated parameters and weights.
 
 ## Calculating accuracy and clustering statistics
 
