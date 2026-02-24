@@ -6,6 +6,73 @@ import numpy as np
 from concurrent.futures import ProcessPoolExecutor
 import argparse
 import csv
+import subprocess
+import tempfile
+import os
+
+
+def run_connectivity_refinement(graph, partition,
+                                mode="cm",   # cm / cc / wcc
+                                gamma=0.5,
+                                threshold=None):
+
+    if mode == "none":
+        return partition
+
+    if mode == "cm":
+        clusterer = "leiden"
+        threshold = threshold or "1log10"
+
+    elif mode == "cc":
+        clusterer = "nop"
+        threshold = threshold or "0.1"
+
+    elif mode == "wcc":
+        clusterer = "nop"
+        threshold = threshold or "1log10"
+
+    else:
+        raise ValueError("Unknown refinement mode")
+
+    with tempfile.TemporaryDirectory() as tmp:
+
+        net_file = os.path.join(tmp, "network.tsv")
+        part_file = os.path.join(tmp, "clustering.tsv")
+        out_file = os.path.join(tmp, "output.tsv")
+
+        # write network
+        with open(net_file, "w") as f:
+            for u, v in graph.edges():
+                f.write(f"{u}\t{v}\n")
+
+        # write partition
+        with open(part_file, "w") as f:
+            for node, comm in partition.items():
+                f.write(f"{node}\t{comm}\n")
+
+        cmd = [
+            "python3", "-m", "hm01.cm",
+            "-i", net_file,
+            "-e", part_file,
+            "-o", out_file,
+            "-c", clusterer,
+            "--threshold", threshold,
+            "--nprocs", str(1),
+            "--quiet"
+        ]
+
+        if clusterer == "leiden-cpm": # TODO: also handle modularity
+            cmd += ["-g", str(gamma)]
+
+        subprocess.run(cmd, check=True)
+
+        refined = {}
+        with open(out_file) as f:
+            for line in f:
+                node, comm = line.strip().split()
+                refined[int(node)] = int(comm)
+
+        return refined
 
 
 def _partition_worker(args):
@@ -142,7 +209,8 @@ def _partition_worker_spec(args):
 
 def fast_ensemble(G, partition_specs=None, algorithm=None,
                   res_value=0.01, n_p=10, tr=0.8, final_alg='leiden-cpm', final_param=0.01,
-                  weighted='weight', use_parallel=False):
+                  weighted='weight', use_parallel=False,
+                  refine_mode=None, refine_base=False, refine_final=True):
     graph = G.copy()
     graph = initialize(graph, 1.0)
 
@@ -179,6 +247,13 @@ def fast_ensemble(G, partition_specs=None, algorithm=None,
                                 ig_graph=ig_graph)
             )
 
+            if refine_mode and refine_base:
+                for i in range(len(partitions)):
+                    partitions[i] = run_connectivity_refinement(
+                    graph, partitions[i],
+                    mode=refine_mode,
+                    gamma=res_value)
+
     remove_edges = []
 
     for u, v in graph.edges():
@@ -197,12 +272,19 @@ def fast_ensemble(G, partition_specs=None, algorithm=None,
 
     final_ig = None if final_alg == 'louvain' else ig.Graph.from_networkx(graph)
 
-    return get_communities(graph,
+    final= get_communities(graph,
                            final_alg,
                            0,
                            res_val=final_param,
                            weighted=weighted,
                            ig_graph=final_ig)
+    if refine_mode and refine_final:
+        final = run_connectivity_refinement(
+            graph, final,
+            mode=refine_mode,
+            gamma=res_value, # TODO: fix for modularity
+        )
+    return final
 
 
 def read_alg_list(list_path):
@@ -222,10 +304,10 @@ def read_alg_list(list_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="FastEnsemble Clustering")
     parser.add_argument("-n", "--edgelist", type=str,  required=True,
-                        help="Network edge-list file")
+                        help="Network edge-list")
     parser.add_argument("-alg", "--algorithm", type=str, required=False,
                         help="Clustering algorithm (leiden-mod, leiden-cpm or louvain)", default='leiden-cpm')
-    parser.add_argument("-o", "--output", type=str, required=True,
+    parser.add_argument("-o", "--output", type=str, required=False,
                         help="Output community file")
     parser.add_argument("-t", "--threshold", type=float, required=False,
                         help="Threshold value", default=0.8)
@@ -243,10 +325,12 @@ if __name__ == "__main__":
                         help="A list of clustering algorithms, with parameters and weights")
     parser.add_argument("-nw", "--noweight", required=False, action='store_true',
                         help="Specify that clustering methods should NOT take the edge weights into account", default=False)
-    parser.add_argument("-mp", "--multiprocessing",
-                        required=False, action='store_true',
-                        help="Enable multiprocessing for partition generation",
-                        default=False)
+    parser.add_argument("-mp", "--multiprocessing", required=False, action='store_true',
+                        help="Enable multiprocessing for partition generation", default=False)
+    parser.add_argument("--refine", choices=["none", "cm", "cc", "wcc"], default="none",
+                        help="Connectivity refinement")
+    parser.add_argument("--refinebase", action="store_true", help="Refine each base partition")
+    parser.add_argument("--refinefinal", action="store_true", help="Refine final clustering")
 
     args = parser.parse_args()
     net = nx.read_edgelist(args.edgelist, nodetype=int)
@@ -285,7 +369,11 @@ if __name__ == "__main__":
                        final_alg=args.finalalgorithm,
                        final_param=args.finalparam,
                        weighted=None if args.noweight else 'weight',
-                       use_parallel=args.multiprocessing)
+                       use_parallel=args.multiprocessing,
+                       refine_mode=args.refine,
+                       refine_base=args.refinebase,
+                       refine_final=args.refinefinal,
+                       )
 
     keys = list(fe.keys())
     keys.sort()
