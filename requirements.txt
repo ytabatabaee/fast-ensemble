@@ -2,4 +2,4 @@ networkX
 numpy
 igraph
 leidenalg
-
+python-louvain

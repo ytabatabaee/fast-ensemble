@@ -22,8 +22,20 @@ FastEnsemble is implemented in Python 3 and have the following dependencies:
 - [igraph](https://igraph.org/)
 - [leidenalg](https://leidenalg.readthedocs.io/en/stable/intro.html)
 - [Numpy](https://numpy.org)
+- [python-louvain](https://github.com/taynaud/python-louvain)
 
 If you have Python 3 and pip, you can use `pip install -r requirements.txt` to install the other dependencies.
+
+## Installation
+From source:
+```
+pip install .
+```
+
+After publishing to PyPI:
+```
+pip install fast-ensemble
+```
 
 ## Usage Instructions
 In its simplest form, FastEnsemble combines multiple runs of a *single* clustering algorithm, and can be used with the following command:
@@ -94,4 +106,30 @@ $ python3 evaluate_partition.py -n <edge-list> -m <partition-membership>
 The script [scripts/clustering_accuracy.py](https://github.com/ytabatabaee/fast-ensemble/tree/main/scripts/clustering_accuracy.py) can be used for computing multiple accuracy measures (NMI, AMI, ARI, false positive rate, false negative rate, precision, recall and F1-score) for a clustering with respect to a ground-truth community membership.
 ```
 $ python3 clustering_accuracy.py -gt <ground-truth-membership> -p <estimated-partition>
+```
+
+## Releasing to PyPI
+1. Create accounts for [PyPI](https://pypi.org) and [TestPyPI](https://test.pypi.org), then create an API token.
+2. Build distributions from the repository root:
+   ```
+   python -m pip install --upgrade build twine
+   python -m build
+   python -m twine check dist/*
+   ```
+3. Upload to TestPyPI first:
+   ```
+   python -m twine upload --repository testpypi dist/*
+   ```
+4. Validate install from TestPyPI:
+   ```
+   pip install --index-url https://test.pypi.org/simple/ fast-ensemble
+   ```
+5. Upload the same artifacts to PyPI:
+   ```
+   python -m twine upload dist/*
+   ```
+
+The CLI command installed from the package is:
+```
+fast-ensemble -n <edge-list> -o <output> [other options]
 ```
