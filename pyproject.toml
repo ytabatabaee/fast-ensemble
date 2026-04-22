@@ -43,3 +43,6 @@ fast-ensemble = "fast_ensemble:main"
 [tool.setuptools]
 py-modules = ["fast_ensemble"]
 license-files = []
+
+[tool.setuptools.data-files]
+"." = ["LICENSE"]
