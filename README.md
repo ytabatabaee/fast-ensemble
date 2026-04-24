@@ -1,4 +1,9 @@
 # Fast Ensemble Clustering
+[![PyPI version](https://img.shields.io/pypi/v/fast-ensemble-clustering.svg)](https://pypi.org/project/fast-ensemble-clustering/)
+[![PyPI license](https://img.shields.io/pypi/l/fast-ensemble-clustering.svg)](https://pypi.org/project/fast-ensemble-clustering/)
+[![PyPI pyversions](https://img.shields.io/pypi/pyversions/fast-ensemble-clustering.svg)](https://pypi.org/project/fast-ensemble-clustering/)
+[![DOI](https://img.shields.io/badge/DOI-10.1371%2Fjournal.pcsy.0000069-blue.svg)](https://doi.org/10.1371/journal.pcsy.0000069)
+[![Build](https://github.com/ytabatabaee/fast-ensemble/actions/workflows/ci.yml/badge.svg)](https://github.com/ytabatabaee/fast-ensemble/actions/workflows/ci.yml)
 
 **FastEnsemble** is a scalable ensemble clustering method that can be used with one or a combination of clustering algorithms. It is currently implemented for use with **Leiden** optimizing **CPM** or **modularity** and the **Louvain** algorithm. 
 
@@ -34,7 +39,7 @@ pip install .
 
 After publishing to PyPI:
 ```
-pip install fast-ensemble
+pip install fast-ensemble-clustering
 ```
 
 ## Usage Instructions
@@ -106,30 +111,4 @@ $ python3 evaluate_partition.py -n <edge-list> -m <partition-membership>
 The script [scripts/clustering_accuracy.py](https://github.com/ytabatabaee/fast-ensemble/tree/main/scripts/clustering_accuracy.py) can be used for computing multiple accuracy measures (NMI, AMI, ARI, false positive rate, false negative rate, precision, recall and F1-score) for a clustering with respect to a ground-truth community membership.
 ```
 $ python3 clustering_accuracy.py -gt <ground-truth-membership> -p <estimated-partition>
-```
-
-## Releasing to PyPI
-1. Create accounts for [PyPI](https://pypi.org) and [TestPyPI](https://test.pypi.org), then create an API token.
-2. Build distributions from the repository root:
-   ```
-   python -m pip install --upgrade build twine
-   python -m build
-   python -m twine check dist/*
-   ```
-3. Upload to TestPyPI first:
-   ```
-   python -m twine upload --repository testpypi dist/*
-   ```
-4. Validate install from TestPyPI:
-   ```
-   pip install --index-url https://test.pypi.org/simple/ fast-ensemble
-   ```
-5. Upload the same artifacts to PyPI:
-   ```
-   python -m twine upload dist/*
-   ```
-
-The CLI command installed from the package is:
-```
-fast-ensemble -n <edge-list> -o <output> [other options]
 ```

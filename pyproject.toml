@@ -3,8 +3,8 @@ requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fast-ensemble"
-version = "0.1.0"
+name = "fast-ensemble-clustering"
+version = "1.0.0"
 description = "Scalable ensemble clustering on large networks."
 readme = "README.md"
 requires-python = ">=3.9"
