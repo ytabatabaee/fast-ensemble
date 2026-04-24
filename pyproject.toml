@@ -13,7 +13,7 @@ authors = [
 ]
 keywords = ["clustering", "community-detection", "ensemble", "network-science", "leiden", "louvain"]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
   "Programming Language :: Python :: 3",
