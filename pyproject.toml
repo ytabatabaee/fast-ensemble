@@ -8,6 +8,8 @@ version = "1.0.0"
 description = "Scalable ensemble clustering on large networks."
 readme = "README.md"
 requires-python = ">=3.9"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
 authors = [
   { name = "Yasamin Tabatabaee" }
 ]
@@ -15,7 +17,6 @@ keywords = ["clustering", "community-detection", "ensemble", "network-science", 
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Science/Research",
-  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.9",
@@ -38,11 +39,8 @@ Repository = "https://github.com/ytabatabaee/fast-ensemble"
 Issues = "https://github.com/ytabatabaee/fast-ensemble/issues"
 
 [project.scripts]
+fast-ensemble-clustering = "fast_ensemble:main"
 fast-ensemble = "fast_ensemble:main"
 
 [tool.setuptools]
 py-modules = ["fast_ensemble"]
-license-files = []
-
-[tool.setuptools.data-files]
-"." = ["LICENSE"]

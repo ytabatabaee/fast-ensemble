@@ -3,7 +3,6 @@
 [![PyPI license](https://img.shields.io/pypi/l/fast-ensemble-clustering.svg)](https://pypi.org/project/fast-ensemble-clustering/)
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/fast-ensemble-clustering.svg)](https://pypi.org/project/fast-ensemble-clustering/)
 [![DOI](https://img.shields.io/badge/DOI-10.1371%2Fjournal.pcsy.0000069-blue.svg)](https://doi.org/10.1371/journal.pcsy.0000069)
-[![Build](https://github.com/ytabatabaee/fast-ensemble/actions/workflows/ci.yml/badge.svg)](https://github.com/ytabatabaee/fast-ensemble/actions/workflows/ci.yml)
 
 **FastEnsemble** is a scalable ensemble clustering method that can be used with one or a combination of clustering algorithms. It is currently implemented for use with **Leiden** optimizing **CPM** or **modularity** and the **Louvain** algorithm. 
 
@@ -14,45 +13,35 @@ FastEnsemble supports
 - **weighted** ensembles
 -  multiprocessing
 
-The algorithm is described in the following paper:
-
-Y. Tabatabaee, E. Wedell, M. Park, T. Warnow (2025). *FastEnsemble: Scalable ensemble clustering on large networks*. PLOS Complex Systems 2(10): e0000069 [preliminary version appeared at International Conference on Complex Networks and their Applications (CNA) 2024] DOI: [10.1371/journal.pcsy.0000069](https://journals.plos.org/complexsystems/article?id=10.1371/journal.pcsy.0000069)
-
-Datasets and scripts from this study are available at [ensemble-clustering-data](https://github.com/ytabatabaee/ensemble-clustering-data) repository.
-
-## Dependencies
-FastEnsemble is implemented in Python 3 and have the following dependencies:
-- [Python 3.x](https://www.python.org)
-- [NetworkX](https://networkx.org)
-- [igraph](https://igraph.org/)
-- [leidenalg](https://leidenalg.readthedocs.io/en/stable/intro.html)
-- [Numpy](https://numpy.org)
-- [python-louvain](https://github.com/taynaud/python-louvain)
-
-If you have Python 3 and pip, you can use `pip install -r requirements.txt` to install the other dependencies.
-
 ## Installation
-From source:
+FastEnsemble is implemented in Python 3 and can be installed from PyPI:
 ```
-pip install .
-```
-
-After publishing to PyPI:
-```
-pip install fast-ensemble-clustering
+$ python3 -m pip install fast-ensemble-clustering
 ```
 
-## Usage Instructions
+To install the development version from this repository:
+```
+$ git clone https://github.com/ytabatabaee/fast-ensemble.git
+$ cd fast-ensemble
+$ python3 -m pip install .
+```
+
+To verify successful installation and view command-line options:
+```
+$ fast-ensemble-clustering --help
+```
+
+## Usage
 In its simplest form, FastEnsemble combines multiple runs of a *single* clustering algorithm, and can be used with the following command:
 ```
-$ python3 fast_ensemble.py -n <edge-list> [-t <threshold>] [-alg <algorithm>] [-r <resolution-value>] [-p <number-of-partitions>] [-falg <final-algorithm>] [-fr <final-param>]
+$ fast-ensemble-clustering -n <edge-list> -o <output-membership> [-t <threshold>] [-alg <algorithm>] [-r <resolution-value>] [-p <number-of-partitions>] [-falg <final-algorithm>] [-fr <final-param>]
 ```
 The output clustering membership is in the format `<node_id> <community_id>`. 
 
 **Arguments**
 ```
  -n,  --edgelist               input network edge-list
- -t,  --thresh                 threshold value
+ -t,  --threshold              threshold value
  -alg,  --algorithm            clustering algorithm (leiden-cpm, leiden-mod, louvain)
  -r,  --resolution             resolution value for leiden-cpm
  -falg, --finalalgorithm       clustering algorithm for the final step (leiden-cpm, leiden-mod, louvain) - same as -alg if not specified
@@ -66,7 +55,7 @@ The output clustering membership is in the format `<node_id> <community_id>`.
 ```
 To create a heterogeneous ensemble that allows for an arbitrary combination of clustering algorithms with different parameters (e.g. resolution values) and weights, use the `-alglist` parameter:
 ```
-$ python3 fast_ensemble_weighted.py -n <edge-list> -alglist <algorithm-list> [-falg <final-algorithm> -fr <final-param> -t <threshold>]
+$ fast-ensemble-clustering -n <edge-list> -o <output-membership> -alglist <algorithm-list> [-falg <final-algorithm> -fr <final-param> -t <threshold>]
 ```
 Each line in the algorithm list should be in the format `<algorithm> <resolution> <weight>`, for example
 ```
@@ -89,15 +78,28 @@ We demonstrate the use of FastEnsemble on the [Youtube social network](https://s
 
 In the simplest setting, FastEnsemble combines multiple runs of a single clustering algorithm:
 ```
-$ python3 fast_ensemble.py -n data/youtube-network.dat -t 0.8 -alg leiden-cpm --output data/fe_youtube.dat 
+$ fast-ensemble-clustering -n data/youtube-network.dat -t 0.8 -alg leiden-cpm --output data/fe_youtube.dat 
 ```
 #### Heterogeneous Ensemble
 
 FastEnsemble also supports combining different algorithms and resolution values in a single ensemble through an algorithm list:
 ```
-$ python3 fast_ensemble.py -n data/amazon-network.dat -alglist data/inputs/ensemble_mod_0.01.txt -o data/fe_weighted_amazon.dat
+$ fast-ensemble-clustering -n data/amazon-network.dat -alglist data/inputs/ensemble_mod_0.01.txt -o data/fe_weighted_amazon.dat
 ```
 In this example, the file `ensemble_mod_0.01.txt` specifies a mixture of Leiden-modularity and Leiden-CPM runs with associated parameters and weights.
+
+
+## Publication
+
+If you use FastEnsemble, please cite the following paper:
+
+Y. Tabatabaee, E. Wedell, M. Park, and T. Warnow. 2025. “FastEnsemble: Scalable Ensemble Clustering on Large Networks.” *PLOS Complex Systems* 2(10): e0000069. https://doi.org/10.1371/journal.pcsy.0000069
+
+A preliminary version of this work appeared at the 2024 International Conference on Complex Networks and Their Applications.
+
+### Data Availability
+
+Datasets and scripts from these papers are available at [ensemble-clustering-data](https://github.com/ytabatabaee/ensemble-clustering-data) repository.
 
 ## Calculating accuracy and clustering statistics
 
