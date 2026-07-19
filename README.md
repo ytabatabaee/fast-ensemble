@@ -1,4 +1,9 @@
 # Fast Ensemble Clustering
+[![PyPI version](https://img.shields.io/pypi/v/fast-ensemble-clustering.svg)](https://pypi.org/project/fast-ensemble-clustering/)
+[![PyPI license](https://img.shields.io/pypi/l/fast-ensemble-clustering.svg)](https://pypi.org/project/fast-ensemble-clustering/)
+[![PyPI pyversions](https://img.shields.io/pypi/pyversions/fast-ensemble-clustering.svg)](https://pypi.org/project/fast-ensemble-clustering/)
+[![DOI](https://img.shields.io/badge/DOI-10.1371%2Fjournal.pcsy.0000069-blue.svg)](https://doi.org/10.1371/journal.pcsy.0000069)
+[![Build](https://github.com/ytabatabaee/fast-ensemble/actions/workflows/ci.yml/badge.svg)](https://github.com/ytabatabaee/fast-ensemble/actions/workflows/ci.yml)
 
 **FastEnsemble** is a scalable ensemble clustering method that can be used with one or a combination of clustering algorithms. It is currently implemented for use with **Leiden** optimizing **CPM** or **modularity** and the **Louvain** algorithm. 
 
@@ -22,8 +27,20 @@ FastEnsemble is implemented in Python 3 and have the following dependencies:
 - [igraph](https://igraph.org/)
 - [leidenalg](https://leidenalg.readthedocs.io/en/stable/intro.html)
 - [Numpy](https://numpy.org)
+- [python-louvain](https://github.com/taynaud/python-louvain)
 
 If you have Python 3 and pip, you can use `pip install -r requirements.txt` to install the other dependencies.
+
+## Installation
+From source:
+```
+pip install .
+```
+
+After publishing to PyPI:
+```
+pip install fast-ensemble-clustering
+```
 
 ## Usage Instructions
 In its simplest form, FastEnsemble combines multiple runs of a *single* clustering algorithm, and can be used with the following command:

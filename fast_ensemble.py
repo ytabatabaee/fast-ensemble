@@ -219,7 +219,7 @@ def read_alg_list(list_path):
     return alg_list, np.asarray(param_list), np.asarray(weight_list)
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="FastEnsemble Clustering")
     parser.add_argument("-n", "--edgelist", type=str,  required=True,
                         help="Network edge-list file")
@@ -299,3 +299,7 @@ if __name__ == "__main__":
                 writer.writerow([reverse_mapping[i]] + [membership[i]])
             else:
                 writer.writerow([i] + [membership[i]])
+
+
+if __name__ == "__main__":
+    main()
