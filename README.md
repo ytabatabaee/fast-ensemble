@@ -1,7 +1,7 @@
 # Fast Ensemble Clustering
-[![PyPI version](https://img.shields.io/pypi/v/fast-ensemble-clustering.svg)](https://pypi.org/project/fast-ensemble-clustering/)
-[![PyPI license](https://img.shields.io/pypi/l/fast-ensemble-clustering.svg)](https://pypi.org/project/fast-ensemble-clustering/)
-[![PyPI pyversions](https://img.shields.io/pypi/pyversions/fast-ensemble-clustering.svg)](https://pypi.org/project/fast-ensemble-clustering/)
+[![PyPI version](https://img.shields.io/pypi/v/fast-ensemble-clustering.svg?cacheSeconds=3600)](https://pypi.org/project/fast-ensemble-clustering/)
+[![PyPI license](https://img.shields.io/pypi/l/fast-ensemble-clustering.svg?cacheSeconds=3600)](https://pypi.org/project/fast-ensemble-clustering/)
+[![PyPI pyversions](https://img.shields.io/pypi/pyversions/fast-ensemble-clustering.svg?cacheSeconds=3600)](https://pypi.org/project/fast-ensemble-clustering/)
 [![DOI](https://img.shields.io/badge/DOI-10.1371%2Fjournal.pcsy.0000069-blue.svg)](https://doi.org/10.1371/journal.pcsy.0000069)
 
 **FastEnsemble** is a scalable ensemble clustering method that can be used with one or a combination of clustering algorithms. It is currently implemented for use with **Leiden** optimizing **CPM** or **modularity** and the **Louvain** algorithm. 
