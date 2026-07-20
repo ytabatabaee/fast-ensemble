@@ -34,7 +34,7 @@ $ fast-ensemble-clustering --help
 ## Usage
 In its simplest form, FastEnsemble combines multiple runs of a *single* clustering algorithm, and can be used with the following command:
 ```
-$ fast-ensemble-clustering -n <edge-list> -o <output-membership> [-t <threshold>] [-alg <algorithm>] [-r <resolution-value>] [-p <number-of-partitions>] [-falg <final-algorithm>] [-fr <final-param>]
+$ fast-ensemble-clustering -n <edge-list> -o <output-membership> [-t <threshold>] [-alg <algorithm>] [-r <resolution-value>] [-p <number-of-partitions>] [-falg <final-algorithm>] [-fr <final-param>] [-s <seed>] [-wi]
 ```
 The output clustering membership is in the format `<node_id> <community_id>`. 
 
@@ -55,8 +55,15 @@ The output clustering membership is in the format `<node_id> <community_id>`.
  -alglist,  --algorithmlist    list of clustering algorithms, with parameters and weights
  -rl, --relabel                relabel network nodes from 0 to #nodes-1
  -nw, --noweight               ignore edge weights when clustering
+ -wi, --weighted-input         read the third edge-list column as an input edge weight
  -mp, --multiprocessing        enable multiprocessing
+ -s, --seed                    base random seed for partition generation and final clustering
+ -q, --quiet                   suppress progress logging
 ```
+Use `--seed` for reproducible runs. Partition seeds are derived from the base seed, and the final clustering also uses the base seed.
+
+For weighted edge lists, use `--weighted-input`. The input file should contain three columns: `<node_id> <node_id> <edge_weight>`. Use `--noweight` to ignore edge weights during clustering.
+
 To create a heterogeneous ensemble that allows for an arbitrary combination of clustering algorithms with different parameters (e.g. resolution values) and weights, use the `-alglist` parameter:
 ```
 $ fast-ensemble-clustering -n <edge-list> -o <output-membership> -alglist <algorithm-list> [-falg <final-algorithm> -fr <final-param> -t <threshold>]

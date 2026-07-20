@@ -7,10 +7,14 @@ from concurrent.futures import ProcessPoolExecutor
 import argparse
 import csv
 import logging
+import os
+import statistics
 import time
 
 
 LOGGER_NAME = "fast_ensemble"
+ALLOWED_ALGORITHMS = {"leiden-cpm", "leiden-mod", "louvain"}
+INPUT_WEIGHT_ATTR = "input_weight"
 
 
 def _elapsed(start_time):
@@ -24,6 +28,99 @@ def _log_step(logger, message, start_time=None):
         logger.info(message)
     else:
         logger.info("%s finished in %s", message, _elapsed(start_time))
+
+
+def _validate_algorithm(algorithm, label="algorithm"):
+    if algorithm not in ALLOWED_ALGORITHMS:
+        allowed = ", ".join(sorted(ALLOWED_ALGORITHMS))
+        raise ValueError(f"Invalid {label} '{algorithm}'. Allowed values: {allowed}")
+
+
+def _validate_partition_specs(partition_specs):
+    if not partition_specs:
+        raise ValueError("At least one partition specification is required")
+
+    total_weight = 0
+    for index, (algorithm, res_value, weight) in enumerate(partition_specs, start=1):
+        _validate_algorithm(algorithm, f"algorithm in partition spec {index}")
+        if not np.isfinite(res_value):
+            raise ValueError(f"Parameter in partition spec {index} must be finite")
+        if weight < 0 or not np.isfinite(weight):
+            raise ValueError(f"Weight in partition spec {index} must be finite and non-negative")
+        total_weight += weight
+
+    if total_weight <= 0:
+        raise ValueError("Partition specification weights must sum to > 0")
+
+
+def _validate_fast_ensemble_args(partition_specs, algorithm, n_p, tr, final_alg, final_param):
+    if not 0 <= tr <= 1:
+        raise ValueError("Threshold must be between 0 and 1")
+
+    _validate_algorithm(final_alg, "final algorithm")
+    if not np.isfinite(final_param):
+        raise ValueError("Final parameter must be finite")
+
+    if partition_specs is None:
+        _validate_algorithm(algorithm)
+        if n_p <= 0:
+            raise ValueError("Number of partitions must be > 0")
+    else:
+        _validate_partition_specs(partition_specs)
+
+
+def summarize_partition(membership):
+    cluster_sizes = {}
+    for cluster_id in membership.values():
+        cluster_sizes[cluster_id] = cluster_sizes.get(cluster_id, 0) + 1
+
+    sizes = list(cluster_sizes.values())
+    if not sizes:
+        return {
+            "clusters": 0,
+            "singletons": 0,
+            "min_size": 0,
+            "max_size": 0,
+            "mean_size": 0,
+            "median_size": 0,
+        }
+
+    return {
+        "clusters": len(sizes),
+        "singletons": sum(1 for size in sizes if size == 1),
+        "min_size": min(sizes),
+        "max_size": max(sizes),
+        "mean_size": statistics.mean(sizes),
+        "median_size": statistics.median(sizes),
+    }
+
+
+def log_partition_summary(logger, membership):
+    summary = summarize_partition(membership)
+    if logger is None:
+        return summary
+
+    logger.info(
+        "Final partition summary: clusters=%s, singletons=%s, "
+        "min_size=%s, max_size=%s, mean_size=%.2f, median_size=%.2f",
+        summary["clusters"],
+        summary["singletons"],
+        summary["min_size"],
+        summary["max_size"],
+        summary["mean_size"],
+        summary["median_size"],
+    )
+    return summary
+
+
+def read_network(edge_list_path, weighted_input=False):
+    if weighted_input:
+        graph = nx.read_weighted_edgelist(edge_list_path, nodetype=int)
+        for _, _, data in graph.edges(data=True):
+            data[INPUT_WEIGHT_ATTR] = data["weight"]
+        return graph
+
+    return nx.read_edgelist(edge_list_path, nodetype=int)
 
 
 def _partition_worker(args):
@@ -142,12 +239,20 @@ def build_partition_specs(algorithm=None, res_value=None, n_p=None,
         if total == 0:
             raise ValueError("Weights must sum to > 0")
         weight_list = weight_list / total
-        return [(alg_list[i], param_list[i], weight_list[i])
-                for i in range(len(alg_list))]
+        partition_specs = [
+            (alg_list[i], param_list[i], weight_list[i])
+            for i in range(len(alg_list))
+        ]
+        _validate_partition_specs(partition_specs)
+        return partition_specs
 
     # homogeneous mode
+    if n_p <= 0:
+        raise ValueError("Number of partitions must be > 0")
     alpha = 1.0 / n_p
-    return [(algorithm, res_value, alpha) for _ in range(n_p)]
+    partition_specs = [(algorithm, res_value, alpha) for _ in range(n_p)]
+    _validate_partition_specs(partition_specs)
+    return partition_specs
 
 
 def _partition_worker_spec(args):
@@ -160,8 +265,9 @@ def _partition_worker_spec(args):
 
 def fast_ensemble(G, partition_specs=None, algorithm=None,
                   res_value=0.01, n_p=10, tr=0.8, final_alg='leiden-cpm', final_param=0.01,
-                  weighted='weight', use_parallel=False, logger=None):
+                  weighted='weight', use_parallel=False, logger=None, seed=0):
     total_start = time.perf_counter()
+    _validate_fast_ensemble_args(partition_specs, algorithm, n_p, tr, final_alg, final_param)
     graph = G.copy()
     graph = initialize(graph, 1.0)
     _log_step(logger, "Initialized working graph with unit edge weights")
@@ -181,7 +287,7 @@ def fast_ensemble(G, partition_specs=None, algorithm=None,
         with ProcessPoolExecutor() as executor:
             partitions = list(executor.map(
                 _partition_worker_spec,
-                [(graph, alg, res, i, weighted)
+                [(graph, alg, res, seed + i, weighted)
                  for i, (alg, res, _) in enumerate(partition_specs)]
             ))
     else:
@@ -198,7 +304,7 @@ def fast_ensemble(G, partition_specs=None, algorithm=None,
                 ig_graph = None
 
             partitions.append(
-                get_communities(graph, alg, i,
+                get_communities(graph, alg, seed + i,
                                 res_val=res,
                                 weighted=weighted,
                                 ig_graph=ig_graph)
@@ -239,7 +345,7 @@ def fast_ensemble(G, partition_specs=None, algorithm=None,
 
     final_partition = get_communities(graph,
                                       final_alg,
-                                      0,
+                                      seed,
                                       res_val=final_param,
                                       weighted=weighted,
                                       ig_graph=final_ig)
@@ -248,6 +354,7 @@ def fast_ensemble(G, partition_specs=None, algorithm=None,
         f"Final clustering produced {len(set(final_partition.values()))} cluster(s)",
         final_start
     )
+    log_partition_summary(logger, final_partition)
     _log_step(logger, "FastEnsemble run", total_start)
     return final_partition
 
@@ -255,14 +362,43 @@ def fast_ensemble(G, partition_specs=None, algorithm=None,
 def read_alg_list(list_path):
     alg_list, param_list, weight_list = [], [], []
     with open(list_path) as fgt:
-        for line in fgt:
-            try:
-                alg, param, weight = line.strip().split()
-                alg_list.append(alg)
-                param_list.append(float(param))
-                weight_list.append(float(weight))
-            except:
+        for line_number, line in enumerate(fgt, start=1):
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
                 continue
+
+            parts = stripped.split()
+            if len(parts) != 3:
+                raise ValueError(
+                    f"Invalid algorithm-list line {line_number}: expected "
+                    "'<algorithm> <parameter> <weight>'"
+                )
+
+            alg, param, weight = parts
+            _validate_algorithm(alg, f"algorithm on line {line_number}")
+
+            try:
+                param = float(param)
+                weight = float(weight)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Invalid numeric value on algorithm-list line {line_number}"
+                ) from exc
+
+            if not np.isfinite(param):
+                raise ValueError(f"Parameter on algorithm-list line {line_number} must be finite")
+            if weight < 0 or not np.isfinite(weight):
+                raise ValueError(
+                    f"Weight on algorithm-list line {line_number} must be finite and non-negative"
+                )
+
+            alg_list.append(alg)
+            param_list.append(param)
+            weight_list.append(weight)
+
+    if not alg_list:
+        raise ValueError("Algorithm list is empty")
+
     return alg_list, np.asarray(param_list), np.asarray(weight_list)
 
 
@@ -271,6 +407,7 @@ def main():
     parser.add_argument("-n", "--edgelist", type=str,  required=True,
                         help="Network edge-list file")
     parser.add_argument("-alg", "--algorithm", type=str, required=False,
+                        choices=sorted(ALLOWED_ALGORITHMS),
                         help="Clustering algorithm (leiden-mod, leiden-cpm or louvain)", default='leiden-cpm')
     parser.add_argument("-o", "--output", type=str, required=True,
                         help="Output community file")
@@ -279,7 +416,8 @@ def main():
     parser.add_argument("-r", "--resolution", type=float, required=False,
                         help="Resolution value for leiden-cpm", default=0.01)
     parser.add_argument("-falg", "--finalalgorithm", type=str, required=False,
-                        help="", default=None)
+                        choices=sorted(ALLOWED_ALGORITHMS),
+                        help="Clustering algorithm for the final step", default=None)
     parser.add_argument("-fr", "--finalparam", type=float, required=False,
                         help="Parameter (e.g. resolution value) for the final algorithm", default=None)
     parser.add_argument("-p", "--partitions", type=int, required=False,
@@ -290,18 +428,47 @@ def main():
                         help="A list of clustering algorithms, with parameters and weights")
     parser.add_argument("-nw", "--noweight", required=False, action='store_true',
                         help="Specify that clustering methods should NOT take the edge weights into account", default=False)
+    parser.add_argument("-wi", "--weighted-input", required=False, action='store_true',
+                        help="Read the third edge-list column as an input edge weight",
+                        default=False)
     parser.add_argument("-mp", "--multiprocessing",
                         required=False, action='store_true',
                         help="Enable multiprocessing for partition generation",
                         default=False)
+    parser.add_argument("-s", "--seed", type=int, required=False,
+                        help="Base random seed for partition generation and final clustering",
+                        default=0)
     parser.add_argument("-q", "--quiet",
                         required=False, action='store_true',
                         help="Suppress progress logging",
                         default=False)
 
     args = parser.parse_args()
+    if not os.path.isfile(args.edgelist):
+        parser.error(f"Edge-list file does not exist: {args.edgelist}")
+
+    output_dir = os.path.dirname(os.path.abspath(args.output))
+    if output_dir and not os.path.isdir(output_dir):
+        parser.error(f"Output directory does not exist: {output_dir}")
+
+    if args.algorithmlist and not os.path.isfile(args.algorithmlist):
+        parser.error(f"Algorithm-list file does not exist: {args.algorithmlist}")
+
+    if not 0 <= args.threshold <= 1:
+        parser.error("Threshold must be between 0 and 1")
+
+    if args.partitions <= 0:
+        parser.error("Number of partitions must be > 0")
+
+    if not np.isfinite(args.resolution):
+        parser.error("Resolution value must be finite")
+
+    if args.finalparam is not None and not np.isfinite(args.finalparam):
+        parser.error("Final parameter must be finite")
+
     logger = logging.getLogger(LOGGER_NAME)
     if not args.quiet:
+        logger.setLevel(logging.NOTSET)
         logging.basicConfig(
             level=logging.INFO,
             format="[%(asctime)s] %(message)s",
@@ -314,13 +481,18 @@ def main():
     total_start = time.perf_counter()
     read_start = time.perf_counter()
     logger.info("Reading edge list from %s", args.edgelist)
-    net = nx.read_edgelist(args.edgelist, nodetype=int)
+    try:
+        net = read_network(args.edgelist, weighted_input=args.weighted_input)
+    except Exception as exc:
+        parser.error(f"Could not read edge-list file: {exc}")
     logger.info(
         "Loaded network with %s node(s) and %s edge(s) in %s",
         net.number_of_nodes(),
         net.number_of_edges(),
         _elapsed(read_start)
     )
+    if args.weighted_input:
+        logger.info("Using third edge-list column as input edge weights")
 
     # relabeling nodes from 0 to n-1
     if args.relabel:
@@ -333,17 +505,20 @@ def main():
     n_p = args.partitions
     if not args.finalalgorithm:
         args.finalalgorithm = args.algorithm
-    if not args.finalparam:
+    if args.finalparam is None:
         args.finalparam = args.resolution
 
     if args.algorithmlist:
         alg_list_start = time.perf_counter()
-        alg_list, param_list, weight_list = read_alg_list(args.algorithmlist)
-        partition_specs = build_partition_specs(
-            alg_list=alg_list,
-            param_list=param_list,
-            weight_list=weight_list
-        )
+        try:
+            alg_list, param_list, weight_list = read_alg_list(args.algorithmlist)
+            partition_specs = build_partition_specs(
+                alg_list=alg_list,
+                param_list=param_list,
+                weight_list=weight_list
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
         logger.info(
             "Loaded %s algorithm-list entry/entries from %s in %s",
             len(partition_specs),
@@ -356,6 +531,12 @@ def main():
     if partition_specs is not None:
         algorithm = None
 
+    weighted_attr = None if args.noweight else "weight"
+    if args.weighted_input and not args.noweight:
+        weighted_attr = INPUT_WEIGHT_ATTR
+
+    logger.info("Using base random seed %s", args.seed)
+
     fe = fast_ensemble(net,
                        partition_specs=partition_specs,
                        algorithm=args.algorithm,
@@ -364,9 +545,10 @@ def main():
                        tr=args.threshold,
                        final_alg=args.finalalgorithm,
                        final_param=args.finalparam,
-                       weighted=None if args.noweight else 'weight',
+                       weighted=weighted_attr,
                        use_parallel=args.multiprocessing,
-                       logger=logger)
+                       logger=logger,
+                       seed=args.seed)
 
     output_start = time.perf_counter()
     keys = list(fe.keys())
