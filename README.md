@@ -39,8 +39,13 @@ $ fast-ensemble-clustering -n <edge-list> -o <output-membership> [-t <threshold>
 The output clustering membership is in the format `<node_id> <community_id>`. 
 
 **Arguments**
+- **Required**
 ```
  -n,  --edgelist               input network edge-list
+ -o,  --output                 output community membership
+```
+- **Optional**
+```
  -t,  --threshold              threshold value
  -alg,  --algorithm            clustering algorithm (leiden-cpm, leiden-mod, louvain)
  -r,  --resolution             resolution value for leiden-cpm
@@ -50,7 +55,6 @@ The output clustering membership is in the format `<node_id> <community_id>`.
  -alglist,  --algorithmlist    list of clustering algorithms, with parameters and weights
  -rl, --relabel                relabel network nodes from 0 to #nodes-1
  -nw, --noweight               ignore edge weights when clustering
- -o, --output                  output community membership
  -mp, --multiprocessing        enable multiprocessing
 ```
 To create a heterogeneous ensemble that allows for an arbitrary combination of clustering algorithms with different parameters (e.g. resolution values) and weights, use the `-alglist` parameter:
@@ -93,9 +97,9 @@ In this example, the file `ensemble_mod_0.01.txt` specifies a mixture of Leiden-
 
 If you use FastEnsemble, please cite the following paper:
 
-Y. Tabatabaee, E. Wedell, M. Park, and T. Warnow. 2025. “FastEnsemble: Scalable Ensemble Clustering on Large Networks.” *PLOS Complex Systems* 2(10): e0000069. https://doi.org/10.1371/journal.pcsy.0000069
+> Y. Tabatabaee, E. Wedell, M. Park, and T. Warnow. 2025. “FastEnsemble: Scalable Ensemble Clustering on Large Networks.” *PLOS Complex Systems* 2(10): e0000069. https://doi.org/10.1371/journal.pcsy.0000069
 
-A preliminary version of this work appeared at the 2024 International Conference on Complex Networks and Their Applications.
+A preliminary version of this work appeared at the 2024 International Conference on Complex Networks and Their Applications: https://doi.org/10.1007/978-3-031-82435-7_5
 
 ### Data Availability
 

@@ -6,6 +6,24 @@ import numpy as np
 from concurrent.futures import ProcessPoolExecutor
 import argparse
 import csv
+import logging
+import time
+
+
+LOGGER_NAME = "fast_ensemble"
+
+
+def _elapsed(start_time):
+    return f"{time.perf_counter() - start_time:.2f}s"
+
+
+def _log_step(logger, message, start_time=None):
+    if logger is None:
+        return
+    if start_time is None:
+        logger.info(message)
+    else:
+        logger.info("%s finished in %s", message, _elapsed(start_time))
 
 
 def _partition_worker(args):
@@ -142,9 +160,11 @@ def _partition_worker_spec(args):
 
 def fast_ensemble(G, partition_specs=None, algorithm=None,
                   res_value=0.01, n_p=10, tr=0.8, final_alg='leiden-cpm', final_param=0.01,
-                  weighted='weight', use_parallel=False):
+                  weighted='weight', use_parallel=False, logger=None):
+    total_start = time.perf_counter()
     graph = G.copy()
     graph = initialize(graph, 1.0)
+    _log_step(logger, "Initialized working graph with unit edge weights")
 
     if partition_specs is None:
         partition_specs = build_partition_specs(
@@ -152,9 +172,12 @@ def fast_ensemble(G, partition_specs=None, algorithm=None,
             res_value=res_value,
             n_p=n_p
         )
+    _log_step(logger, f"Prepared {len(partition_specs)} partition specification(s)")
 
     # ---- Generate partitions ----
+    partition_start = time.perf_counter()
     if use_parallel:
+        _log_step(logger, "Generating ensemble partitions with multiprocessing")
         with ProcessPoolExecutor() as executor:
             partitions = list(executor.map(
                 _partition_worker_spec,
@@ -162,9 +185,11 @@ def fast_ensemble(G, partition_specs=None, algorithm=None,
                  for i, (alg, res, _) in enumerate(partition_specs)]
             ))
     else:
+        _log_step(logger, "Generating ensemble partitions")
         ig_cache = {}
         partitions = []
         for i, (alg, res, _) in enumerate(partition_specs):
+            part_start = time.perf_counter()
             if alg != 'louvain':
                 if alg not in ig_cache:
                     ig_cache[alg] = ig.Graph.from_networkx(graph)
@@ -178,9 +203,16 @@ def fast_ensemble(G, partition_specs=None, algorithm=None,
                                 weighted=weighted,
                                 ig_graph=ig_graph)
             )
+            _log_step(
+                logger,
+                f"Partition {i + 1}/{len(partition_specs)} ({alg}, parameter={res})",
+                part_start
+            )
+    _log_step(logger, f"Generated {len(partitions)} ensemble partition(s)", partition_start)
 
     remove_edges = []
 
+    threshold_start = time.perf_counter()
     for u, v in graph.edges():
         weight = 1.0
 
@@ -194,15 +226,30 @@ def fast_ensemble(G, partition_specs=None, algorithm=None,
         graph[u][v]['weight'] = weight
 
     graph.remove_edges_from(remove_edges)
+    _log_step(
+        logger,
+        f"Applied threshold {tr}; removed {len(remove_edges)} edge(s), "
+        f"kept {graph.number_of_edges()} edge(s)",
+        threshold_start
+    )
 
+    final_start = time.perf_counter()
+    _log_step(logger, f"Running final clustering with {final_alg}, parameter={final_param}")
     final_ig = None if final_alg == 'louvain' else ig.Graph.from_networkx(graph)
 
-    return get_communities(graph,
-                           final_alg,
-                           0,
-                           res_val=final_param,
-                           weighted=weighted,
-                           ig_graph=final_ig)
+    final_partition = get_communities(graph,
+                                      final_alg,
+                                      0,
+                                      res_val=final_param,
+                                      weighted=weighted,
+                                      ig_graph=final_ig)
+    _log_step(
+        logger,
+        f"Final clustering produced {len(set(final_partition.values()))} cluster(s)",
+        final_start
+    )
+    _log_step(logger, "FastEnsemble run", total_start)
+    return final_partition
 
 
 def read_alg_list(list_path):
@@ -247,15 +294,41 @@ def main():
                         required=False, action='store_true',
                         help="Enable multiprocessing for partition generation",
                         default=False)
+    parser.add_argument("-q", "--quiet",
+                        required=False, action='store_true',
+                        help="Suppress progress logging",
+                        default=False)
 
     args = parser.parse_args()
+    logger = logging.getLogger(LOGGER_NAME)
+    if not args.quiet:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="[%(asctime)s] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+    else:
+        logger.addHandler(logging.NullHandler())
+        logger.setLevel(logging.CRITICAL + 1)
+
+    total_start = time.perf_counter()
+    read_start = time.perf_counter()
+    logger.info("Reading edge list from %s", args.edgelist)
     net = nx.read_edgelist(args.edgelist, nodetype=int)
+    logger.info(
+        "Loaded network with %s node(s) and %s edge(s) in %s",
+        net.number_of_nodes(),
+        net.number_of_edges(),
+        _elapsed(read_start)
+    )
 
     # relabeling nodes from 0 to n-1
     if args.relabel:
+        relabel_start = time.perf_counter()
         mapping = dict(zip(sorted(net), range(0, net.number_of_nodes())))
         net = nx.relabel_nodes(net, mapping)
         reverse_mapping = {y: x for x, y in mapping.items()}
+        _log_step(logger, "Relabeled network nodes", relabel_start)
 
     n_p = args.partitions
     if not args.finalalgorithm:
@@ -264,11 +337,18 @@ def main():
         args.finalparam = args.resolution
 
     if args.algorithmlist:
+        alg_list_start = time.perf_counter()
         alg_list, param_list, weight_list = read_alg_list(args.algorithmlist)
         partition_specs = build_partition_specs(
             alg_list=alg_list,
             param_list=param_list,
             weight_list=weight_list
+        )
+        logger.info(
+            "Loaded %s algorithm-list entry/entries from %s in %s",
+            len(partition_specs),
+            args.algorithmlist,
+            _elapsed(alg_list_start)
         )
     else:
         partition_specs = None
@@ -285,8 +365,10 @@ def main():
                        final_alg=args.finalalgorithm,
                        final_param=args.finalparam,
                        weighted=None if args.noweight else 'weight',
-                       use_parallel=args.multiprocessing)
+                       use_parallel=args.multiprocessing,
+                       logger=logger)
 
+    output_start = time.perf_counter()
     keys = list(fe.keys())
     keys.sort()
     membership_dict = {i: fe[i] for i in keys}
@@ -299,6 +381,9 @@ def main():
                 writer.writerow([reverse_mapping[i]] + [membership[i]])
             else:
                 writer.writerow([i] + [membership[i]])
+    logger.info("Wrote %s node membership(s) to %s in %s",
+                len(membership), args.output, _elapsed(output_start))
+    logger.info("Completed FastEnsemble CLI run in %s", _elapsed(total_start))
 
 
 if __name__ == "__main__":
